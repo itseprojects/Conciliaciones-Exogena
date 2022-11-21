@@ -178,5 +178,3 @@ def UnificarClientesPorCuenta(df,limiteInferiorCta,LimiteSuperiorCta,nombreDatoC
     return datosPorCliente
 
    
-
-
