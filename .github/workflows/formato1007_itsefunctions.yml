@@ -10,6 +10,7 @@ on:
       - formato1007
     paths:
       - 'formato1001/**'
+      - 'JumioHV/**'
   workflow_dispatch:
 
 env:
