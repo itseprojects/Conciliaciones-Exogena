@@ -3,11 +3,24 @@ Created on Wed Oct 19 11:08:32 2022
 
 @author: HaroldFerneyGomez
 """
+from asyncore import read
+from cmath import nan
+from dataclasses import fields
 import logging
+from operator import index
+
 import azure.functions as func
+
+from datetime import datetime, timedelta
+import pandas as pd
 from azure.storage.blob import BlobSasPermissions, generate_blob_sas, BlobServiceClient
+import urllib.parse
+from math import ceil
+from io import BytesIO
+# para funcion de Jumio
 import requests
 from requests.auth import HTTPDigestAuth
+
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
     name = req.get_json().get('name')
@@ -19,10 +32,10 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     newEmployee = searchLastEmployee()
     addPerson(newEmployee,name,dateFly,endFly,gender)
     agregarFaceData(newEmployee,name,image_url)
-    return func.HttpResponse("Good")
+    return func.HttpResponse("pasó bien")
 
 def searchLastEmployee():
-    url = 'http://190.145.128.77/ISAPI/AccessControl/UserInfo/Search?format=json'
+    url = 'http://186.29.90.58:8661/ISAPI/AccessControl/UserInfo/Search?format=json'
     data = {
     "UserInfoSearchCond":{
         "searchID":"3",
@@ -30,7 +43,7 @@ def searchLastEmployee():
         "maxResults": 20
     }
     }
-    employees =requests.post(url, auth=HTTPDigestAuth('admin', 'z8Vh-_6K4M-qwH6'),json=data).json()
+    employees =requests.post(url, auth=HTTPDigestAuth('admin', 'abc12345'),json=data).json()
     Listemployees = employees['UserInfoSearch']['UserInfo']
     compara = 0
     for NEMpleado in Listemployees:
@@ -40,17 +53,17 @@ def searchLastEmployee():
     return(newEmployee)
 
 def addPerson(newEmployee,name,dateFly,endFly,gender):
-    url = 'http://190.145.128.77/ISAPI/AccessControl/UserInfo/Record?format=json'
+    url = 'http://186.29.90.58:8661/ISAPI/AccessControl/UserInfo/Record?format=json'
     data = {
     "UserInfo": {
         "employeeNo": str(newEmployee),
         "name": name,
         "userType": "visitor",
         "Valid": {
-            "enable": True,
-            "beginTime": dateFly,
-            "endTime": endFly,
-            "timeType": "local"
+        "enable": True,
+        "beginTime": dateFly,
+        "endTime": endFly,
+        "timeType": "local"
         },
         "RightPlan": [
             {
@@ -71,10 +84,10 @@ def addPerson(newEmployee,name,dateFly,endFly,gender):
         ]
     }
     }
-    print(requests.post(url, auth=HTTPDigestAuth('admin', 'z8Vh-_6K4M-qwH6'),json=data).json())
+    print(requests.post(url, auth=HTTPDigestAuth('admin', 'abc12345'),json=data).json())
 
 def agregarFaceData(newEmployee,name,image_url):
-    url = "http://190.145.128.77/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json"
+    url = "http://186.29.90.58:8661/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json"
     data = {
         "faceURL":image_url,
         "faceLibType": "blackFD",
@@ -83,4 +96,4 @@ def agregarFaceData(newEmployee,name,image_url):
         "name": name,
         "bornTime": "2004-05-03"
     }
-    print(requests.post(url, auth=HTTPDigestAuth('admin', 'z8Vh-_6K4M-qwH6'),json=data).json())
+    print(requests.post(url, auth=HTTPDigestAuth('admin', 'abc12345'),json=data).json())
