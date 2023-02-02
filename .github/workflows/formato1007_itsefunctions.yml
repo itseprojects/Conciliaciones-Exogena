@@ -8,8 +8,6 @@ on:
   push:
     branches:
       - formato1007
-    paths:
-      - 'formato1001/**'
   workflow_dispatch:
 
 env:
