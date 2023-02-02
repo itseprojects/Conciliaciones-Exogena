@@ -130,11 +130,13 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         # leer balance y extraer columna del saldo total
         blob_client = blob_service_client.get_blob_client(container = container_name, blob = blob_name)
         downloader = blob_client.download_blob()
-        Datos = pd.read_excel(downloader.readall(), sheet_name=nombreHojaBalance, nrows=0, header=10)
+        Datos = pd.read_excel(downloader.readall(), sheet_name=nombreHojaBalance, nrows=0, header=10,engine='openpyxl')
         ColumnaValorIngreso = Datos.columns.get_loc("Saldo final a")
         
         # leer resto del balance
-        Datos = pd.read_excel(downloader.readall(), sheet_name=nombreHojaBalance, header=HeaderHojaBalance)
+        blob_client = blob_service_client.get_blob_client(container = container_name, blob = blob_name)
+        downloader = blob_client.download_blob()
+        Datos = pd.read_excel(downloader.readall(), sheet_name=nombreHojaBalance, header=HeaderHojaBalance,engine='openpyxl')
         Datos = Datos[~Datos['Cuentas'].isnull()]
         DatosSeparados = separarCuentas(Datos)
         ColumnaValorIngreso += 3    # separaCuentas añade 3 columnas
@@ -182,17 +184,14 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
 #       account_name, account_key, blob_name_to_save
 #   retorna: none
 def PutColorsAnsSaveToBlob(Datos):
-    Datos[['Pago o abono en cuenta deducible', 'Pago o abono en cuenta no deducible','Iva mayor valor del costo o gasto deducible',
-           'Iva mayor valor del costo o gasto no deducible','Retención en la fuente practicada en renta','Retención en la fuente asumida en renta',
-           'Retención en la fuente practicada IVA régimen común','Retención en la fuente practicada IVA no domiciliados']].apply(np.ceil)
-    # Datos['Pago o abono en cuenta deducible'] = Datos['Pago o abono en cuenta deducible'].apply(np.ceil)
-    # Datos['Pago o abono en cuenta no deducible'] = Datos['Pago o abono en cuenta no deducible'].apply(np.ceil)
-    # Datos['Iva mayor valor del costo o gasto deducible'] = Datos['Iva mayor valor del costo o gasto deducible'].apply(np.ceil)
-    # Datos['Iva mayor valor del costo o gasto no deducible'] = Datos['Iva mayor valor del costo o gasto no deducible'].apply(np.ceil)
-    # Datos['Pago o abono en cuenta deducible'] = Datos['Pago o abono en cuenta deducible'].apply(np.ceil)
-    # Datos['Pago o abono en cuenta no deducible'] = Datos['Pago o abono en cuenta no deducible'].apply(np.ceil)
-    # Datos['Pago o abono en cuenta deducible'] = Datos['Pago o abono en cuenta deducible'].apply(np.ceil)
-    # Datos['Retención en la fuente practicada IVA no domiciliados'] = Datos['Retención en la fuente practicada IVA no domiciliados'].apply(np.ceil)
+    Datos['Pago o abono en cuenta deducible'] = Datos['Pago o abono en cuenta deducible'].apply(np.ceil)
+    Datos['Pago o abono en cuenta no deducible'] = Datos['Pago o abono en cuenta no deducible'].apply(np.ceil)
+    Datos['Iva mayor valor del costo o gasto deducible'] = Datos['Iva mayor valor del costo o gasto deducible'].apply(np.ceil)
+    Datos['Iva mayor valor del costo o gasto no deducible'] = Datos['Iva mayor valor del costo o gasto no deducible'].apply(np.ceil)
+    Datos['Retención en la fuente practicada en renta'] = Datos['Retención en la fuente practicada en renta'].apply(np.ceil)
+    Datos['Retención en la fuente asumida en renta'] = Datos['Retención en la fuente asumida en renta'].apply(np.ceil)
+    Datos['Retención en la fuente practicada IVA régimen común'] = Datos['Retención en la fuente practicada IVA régimen común'].apply(np.ceil)
+    Datos['Retención en la fuente practicada IVA no domiciliados'] = Datos['Retención en la fuente practicada IVA no domiciliados'].apply(np.ceil)
     
     fillOrange = PatternFill(patternType='solid', fgColor='FCBA03')
     fillRed = PatternFill(patternType='solid', fgColor='EE1111')
