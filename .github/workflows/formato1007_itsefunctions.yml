@@ -67,6 +67,6 @@ jobs:
           app-name: 'ItseFunctions'
           slot-name: 'Production'
           package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_9B62459F1302497BB224C8F4E55C2FA5 }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_1B363CA62B4B42BEBEE8DC6FDD7E6A7A }}
           scm-do-build-during-deployment: true
           enable-oryx-build: true
