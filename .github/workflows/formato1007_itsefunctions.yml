@@ -8,12 +8,10 @@ on:
   push:
     branches:
       - formato1007
-    paths:
-      - 'functions/**'
   workflow_dispatch:
 
 env:
-  AZURE_FUNCTIONAPP_PACKAGE_PATH: 'functions' # set this to the path to your web app project, defaults to the repository root
+  AZURE_FUNCTIONAPP_PACKAGE_PATH: '.' # set this to the path to your web app project, defaults to the repository root
   PYTHON_VERSION: '3.9' # set this to the python version to use (supports 3.6, 3.7, 3.8)
 
 jobs:
@@ -67,6 +65,6 @@ jobs:
           app-name: 'ItseFunctions'
           slot-name: 'Production'
           package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_81287EF81C804B4DB48B84D11BC557E2 }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_9B62459F1302497BB224C8F4E55C2FA5 }}
           scm-do-build-during-deployment: true
           enable-oryx-build: true
