@@ -8,7 +8,7 @@ from cmath import nan
 import logging
 from operator import index
 import azure.functions as func
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import pandas as pd
 from azure.storage.blob import BlobSasPermissions, generate_blob_sas, BlobServiceClient
 import urllib.parse
@@ -27,7 +27,7 @@ account_key = 'd9sOh0WeqvVF66NQnyWKZWFL/KDje0LizX8UyFWpWX39lLX2C8fxnqRtYD2lOFvNp
 # container_name = 'data' #'test'
 
 MupiosenBlob = "Municipios_de_Colombia.xlsx"
-blob_name_to_save = 'Formato1001.xlsx' # Archivo excel a guardar en el blob correspondiente al formato
+blob_name_to_save = 'Formato1001.xlsx'+ str(date.today())+'.xlsx' # Archivo excel a guardar en el blob correspondiente al formato
 
 # para trabajar localmente, solicitado en el body del trigger equivalente a balanceFile
 # FilePath = "balance 2021 Exeltis con terceros.xlsx"
