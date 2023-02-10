@@ -24,20 +24,15 @@ import unicodedata
 # Datos del blob storage
 account_name = 'itseblobdev' #'probepython'
 account_key = 'd9sOh0WeqvVF66NQnyWKZWFL/KDje0LizX8UyFWpWX39lLX2C8fxnqRtYD2lOFvNp6aaayQsAq7T+AStvsHyew==' #Zas0npJX9ryEm4hmW/gatWr8aI91oOCvt+qbQKqWrZJCmhv5qh6S/w6ittYYaDBRjRnoxa0h+A8H+ASttcvrrQ=='
-container_name = 'data' #'test'
-
-# Datos para la base de datos
-blob_name_DB = 'BASE DE DATOS EXELTIS.xls'
-HeaderHojaDB = 0
-nombreHojaDB="Sheet1"
+# container_name = 'data' #'test'
 
 MupiosenBlob = "Municipios_de_Colombia.xlsx"
 blob_name_to_save = 'Formato1001.xlsx' # Archivo excel a guardar en el blob correspondiente al formato
 
-# para trabajar localmente, solicitado en el body del trigger equivalente a blob_name
-FilePath = "balance 2021 Exeltis con terceros.xlsx"
+# para trabajar localmente, solicitado en el body del trigger equivalente a balanceFile
+# FilePath = "balance 2021 Exeltis con terceros.xlsx"
 
-# Definicion de los conceptos para el formato
+# Definicion de los conceptos para el formato tipo SIESA
 conceptos = {"5055":[515500,525500,725500], 
             "5056":[519520],
             "5002":[511000,521000,721000],
@@ -113,10 +108,24 @@ reteIvaNoDomiciliada = [248711]
     # retorna cod 200 con el texto "Ejecución exitosa" si todo fue bien,
     # si hubo algun error retorna el texto "!! Ocurrió un error en la ejecución." más el posible origen del error
 def main(req: func.HttpRequest) -> func.HttpResponse:
-    blob_name = req.get_json().get('Balance')
-    HeaderHojaBalance=11
-    nombreHojaBalance= "Hoja 1"
+    Cliente = req.get_json().get('Cliente') # cliente1
+    TipoBalance = req.get_json().get('TipoBalance') #"SIESA"
+    blob_name_DB = req.get_json().get('BaseDeDatos') #'BASE DE DATOS EXELTIS.xls'
+    balanceFile = req.get_json().get('Balance')
+    
+    if TipoBalance=="SIESA":
+        # Datos para la base de datos
+        blob_name_DB = 'BASE DE DATOS EXELTIS.xls'
+        HeaderHojaDB = 0
+        nombreHojaDB="Sheet1"
+        exito = WorkSiesa(Cliente,balanceFile,blob_name_DB)
+    else: exito = "Tipo de balance no implementado"
 
+    return func.HttpResponse(f"{exito}", status_code=200 )
+
+def WorkSiesa(container_name,balanceFile,blob_name_DB):  
+    HeaderHojaBalance=11
+    nombreHojaBalance= "Hoja 1" 
     try:
         # Ingreso al blob storage
         blob_service_client = BlobServiceClient(account_url = f'https://{account_name }.blob.core.windows.net/', credential = account_key)
@@ -128,13 +137,13 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             pass
         
         # leer balance y extraer columna del saldo total
-        blob_client = blob_service_client.get_blob_client(container = container_name, blob = blob_name)
+        blob_client = blob_service_client.get_blob_client(container = container_name, blob = balanceFile)
         downloader = blob_client.download_blob()
         Datos = pd.read_excel(downloader.readall(), sheet_name=nombreHojaBalance, nrows=0, header=10,engine='openpyxl')
         ColumnaValorIngreso = Datos.columns.get_loc("Saldo final a")
         
         # leer resto del balance
-        blob_client = blob_service_client.get_blob_client(container = container_name, blob = blob_name)
+        blob_client = blob_service_client.get_blob_client(container = container_name, blob = balanceFile)
         downloader = blob_client.download_blob()
         Datos = pd.read_excel(downloader.readall(), sheet_name=nombreHojaBalance, header=HeaderHojaBalance,engine='openpyxl')
         Datos = Datos[~Datos['Cuentas'].isnull()]
@@ -171,11 +180,11 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
                                                                            (TercerosPorConcepto['Retención en la fuente practicada IVA no domiciliados']==0)].index)
         TercerosPorConcepto.rename(columns = {'Ingresos Brutos Recibidos':'Pago o abono en cuenta deducible'}, inplace = True)
         
-        PutColorsAnsSaveToBlob(TercerosPorConcepto)
+        PutColorsAnsSaveToBlob(TercerosPorConcepto,container_name)
         
     except Exception as e:
-        return func.HttpResponse(f"!! Ocurrió un error en la ejecución. \n\t {e} ", status_code=200 )
-    return func.HttpResponse("Ejecución exitosa")
+        return f"!! Ocurrió un error en la ejecución. \n\t {e} "
+    return f'ruta:https://{account_name}.blob.core.windows.net/{container_name}/{blob_name_to_save}'
 
 # Función que agrega color según el tipo de contenido de las columnas y guarda archivo excel en el Blob Storage,
 #   Asigna el color rojo para advertir sobre datos relacionados de la base de datos de usuarios y amarillo para datos relacionados con el balance
@@ -183,7 +192,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
 #       Datos = df del formato con todas las columnas
 #       account_name, account_key, blob_name_to_save
 #   retorna: none
-def PutColorsAnsSaveToBlob(Datos):
+def PutColorsAnsSaveToBlob(Datos,container_name):
     Datos['Pago o abono en cuenta deducible'] = Datos['Pago o abono en cuenta deducible'].apply(np.ceil)
     Datos['Pago o abono en cuenta no deducible'] = Datos['Pago o abono en cuenta no deducible'].apply(np.ceil)
     Datos['Iva mayor valor del costo o gasto deducible'] = Datos['Iva mayor valor del costo o gasto deducible'].apply(np.ceil)
@@ -477,29 +486,29 @@ def UnificarClientesPorCuenta(df,limiteInferiorCta,LimiteSuperiorCta,nombreDatoC
 #   Método opnpyxl requiere de:
 #       FilePath = ruta de archivo excel a poner color y guardar con otro nombre definido
 #   retorna: null
-def GuardarExcel(df, nombreHoja):
+# def GuardarExcel(df, nombreHoja):
     # ExcelWorkbook = load_workbook(FilePath)
     # writer = pd.ExcelWriter(FilePath, engine = 'openpyxl')
     # writer.book = ExcelWorkbook
     # df.to_excel(writer, sheet_name = nombreHoja ,index=False)
     # writer.save()
     # writer.close()
-    wb = openpyxl.load_workbook(FilePath)
-    ws = wb[nombreHoja]
-    fillOrange = PatternFill(patternType='solid', fgColor='FCBA03')
-    fillRed = PatternFill(patternType='solid', fgColor='EE1111')
-    for row, rowval in enumerate(ws.iter_rows(min_row=2, max_row=ws.max_row), start=2):
-        for cell in rowval:
-            if f"{cell.column_letter}"=="B" and f"{cell.value}"=="NE":
-                ws[f"{cell.column_letter}{cell.row}"].fill = fillRed
-            elif f"{cell.column_letter}"=="I" or f"{cell.column_letter}"=="J" or f"{cell.column_letter}"=="K" or f"{cell.column_letter}"=="L":
-                if f"{cell.value}"=="" or f"{cell.value}"=="None":
-                    ws[f"{cell.column_letter}{cell.row}"].fill = fillRed
-            elif f"{cell.column_letter}"=="M" or f"{cell.column_letter}"=="N" or f"{cell.column_letter}"=="O":
-                if cell.value<=100 and cell.value!=0:
-                    ws[f"{cell.column_letter}{cell.row}"].fill = fillOrange
-    wb.save("balance 2021 Exeltis con terceros1.xlsx")
-    wbbb = pd.DataFrame(wb.values)
+    # wb = openpyxl.load_workbook(FilePath)
+    # ws = wb[nombreHoja]
+    # fillOrange = PatternFill(patternType='solid', fgColor='FCBA03')
+    # fillRed = PatternFill(patternType='solid', fgColor='EE1111')
+    # for row, rowval in enumerate(ws.iter_rows(min_row=2, max_row=ws.max_row), start=2):
+    #     for cell in rowval:
+    #         if f"{cell.column_letter}"=="B" and f"{cell.value}"=="NE":
+    #             ws[f"{cell.column_letter}{cell.row}"].fill = fillRed
+    #         elif f"{cell.column_letter}"=="I" or f"{cell.column_letter}"=="J" or f"{cell.column_letter}"=="K" or f"{cell.column_letter}"=="L":
+    #             if f"{cell.value}"=="" or f"{cell.value}"=="None":
+    #                 ws[f"{cell.column_letter}{cell.row}"].fill = fillRed
+    #         elif f"{cell.column_letter}"=="M" or f"{cell.column_letter}"=="N" or f"{cell.column_letter}"=="O":
+    #             if cell.value<=100 and cell.value!=0:
+    #                 ws[f"{cell.column_letter}{cell.row}"].fill = fillOrange
+    # wb.save("balance 2021 Exeltis con terceros1.xlsx")
+    # wbbb = pd.DataFrame(wb.values)
 
 # Función que busca el tercero en la bd según su #id y también le agrega su Mpio 
 #   requiere de:
@@ -606,17 +615,17 @@ def BuscarId(dfBalance,bd,dbMupios):
 # uso:
 #       df = ExtraerCtas()
 #       GuardarExcel(df, 'soloCtas')
-def ExtraerCtas():
-    HeaderHojaBalance=11
-    nombreHojaBalance= "Hoja 1"
+# def ExtraerCtas():
+#     HeaderHojaBalance=11
+#     nombreHojaBalance= "Hoja 1"
     
-    try:
-        Datos = pd.read_excel(FilePath, sheet_name=nombreHojaBalance, header=HeaderHojaBalance)
-        Datos = Datos[~Datos["             Descripción                                "].isnull()]
-        Datos1 = Datos.iloc[:,[0,1]]
-        # print(Datos1)
-        return Datos1
-    except : False
+#     try:
+#         Datos = pd.read_excel(FilePath, sheet_name=nombreHojaBalance, header=HeaderHojaBalance)
+#         Datos = Datos[~Datos["             Descripción                                "].isnull()]
+#         Datos1 = Datos.iloc[:,[0,1]]
+#         # print(Datos1)
+#         return Datos1
+#     except : False
 
 
 # extras:
