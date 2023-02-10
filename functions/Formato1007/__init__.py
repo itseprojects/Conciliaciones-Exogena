@@ -24,7 +24,7 @@ account_key = 'd9sOh0WeqvVF66NQnyWKZWFL/KDje0LizX8UyFWpWX39lLX2C8fxnqRtYD2lOFvNp
 blob_name_DB = 'BASE DE DATOS EXELTIS.xls'
 HeaderHojaDB = 0
 nombreHojaDB="Sheet1"
-blob_name_to_save = 'formato1007-'+ str(date.today())+'.xlsx' 
+blob_name_to_save = 'Formato1007-'+ str(date.today())+'.xlsx' 
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
     Cliente = req.get_json().get('Cliente') # cliente1
