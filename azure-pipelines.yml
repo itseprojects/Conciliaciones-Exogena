@@ -24,6 +24,6 @@ steps:
     sshEndpoint: 'AgenteWindowsssh'
     runOptions: 'commands'
     commands: |
-      cat /Downloads
+      cd /Downloads
       more file.txt
     readyTimeout: '20000'
