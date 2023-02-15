@@ -22,7 +22,6 @@ steps:
       more Downloads\\file.config
       echo ejecutar bat
       Downloads\\filebat.bat
-      Get-Content -path C:\Users\pocdevops\Downloads\file.config
       (Get-Content -path C:\Users\pocdevops\Downloads\file.config -Raw) -replace 'brown','white'|  Set-Content -Path C:\Users\pocdevops\Downloads\file.config
       more Downloads\\file.config
     readyTimeout: '20000'
