@@ -25,6 +25,7 @@ steps:
       more Downloads\\file.txt
       echo ejecutar bat
       Downloads\\filebat.bat
-      powershell Get-Content -path C:\Users\pocdevops\Downloads\file.txt
-      powershell (Get-Content -path C:\Users\pocdevops\Downloads\file.txt -Raw) -replace 'brown','white'
+      powershell Get-Content -path C:\Users\pocdevops\Downloads\file.config
+      powershell ((Get-Content -path C:\Users\pocdevops\Downloads\file.config -Raw) -replace 'brown','white') | Set-Content -Path C:\Users\pocdevops\Downloads\file.config
+      powershell Get-Content -path C:\Users\pocdevops\Downloads\file.config
     readyTimeout: '20000'
