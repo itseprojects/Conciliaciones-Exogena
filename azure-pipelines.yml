@@ -1,14 +1,14 @@
 # Starter pipeline
-# Start with a minimal pipeline that you can customize to build and deploy your code.
-# Add steps that build, run tests, deploy, and more:
-# https://aka.ms/yaml
-
 trigger:
 - formato1007
 
 pool:
   name: 'TestePool'
   #vmImage: ubuntu-latest
+
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
 
 steps:
 - script: echo Hello, world!
@@ -19,4 +19,11 @@ steps:
     echo See https://aka.ms/yaml
   displayName: 'Run a multi-line script'
 
-
+- task: SSH@0
+  inputs:
+    sshEndpoint: 'AgenteWindowsssh'
+    runOptions: 'commands'
+    commands: |
+      cat /Downloads
+      more file.txt
+    readyTimeout: '20000'
