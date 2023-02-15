@@ -11,9 +11,6 @@ pool:
 # https://aka.ms/yaml
 
 steps:
-- script: echo Hello, world!
-  displayName: 'Run a one-line script'
-
 - script: |
     echo Add other tasks to build, test, and deploy your project.
     echo See https://aka.ms/yaml
@@ -28,4 +25,6 @@ steps:
       more Downloads\\file.txt
       echo ejecutar bat
       Downloads\\filebat.bat
+      Get-Content -path C:\Users\pocdevops\Downloads\file.txt
+      (Get-Content -path C:\Users\pocdevops\Downloads\file.txt -Raw) -replace 'brown','white'
     readyTimeout: '20000'
