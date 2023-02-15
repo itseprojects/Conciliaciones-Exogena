@@ -12,8 +12,6 @@ pool:
 
 steps:
 - script: |
-    echo Add other tasks to build, test, and deploy your project.
-    echo See https://aka.ms/yaml
   displayName: 'Run a multi-line script'
 
 - task: SSH@0
@@ -21,11 +19,10 @@ steps:
     sshEndpoint: 'AgenteWindowsssh'
     runOptions: 'commands'
     commands: |
-      echo variables
       more Downloads\\file.config
       echo ejecutar bat
       Downloads\\filebat.bat
       Get-Content -path C:\Users\pocdevops\Downloads\file.config
       (Get-Content -path C:\Users\pocdevops\Downloads\file.config -Raw) -replace 'brown','white'|  Set-Content -Path C:\Users\pocdevops\Downloads\file.config
-      Get-Content -path C:\Users\pocdevops\Downloads\file.config
+      more Downloads\\file.config
     readyTimeout: '20000'
