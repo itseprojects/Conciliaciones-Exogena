@@ -24,5 +24,8 @@ steps:
     sshEndpoint: 'AgenteWindowsssh'
     runOptions: 'commands'
     commands: |
+      echo variables
       more Downloads\\file.txt
+      echo ejecutar bat
+      Downloads\\filebat.bat
     readyTimeout: '20000'
