@@ -26,7 +26,7 @@ steps:
       echo ejecutar bat
       Downloads\\filebat.bat
       powershell Get-Content -path C:\Users\pocdevops\Downloads\file.config
-      content = powershell (Get-Content -path C:\Users\pocdevops\Downloads\file.config -Raw) -replace 'brown','white'
-      content | powershell Set-Content -Path C:\Users\pocdevops\Downloads\file.config
+      powershell $content = powershell (Get-Content -path C:\Users\pocdevops\Downloads\file.config -Raw) -replace 'brown','white'
+      powershell $content | powershell Set-Content -Path C:\Users\pocdevops\Downloads\file.config
       powershell Get-Content -path C:\Users\pocdevops\Downloads\file.config
     readyTimeout: '20000'
