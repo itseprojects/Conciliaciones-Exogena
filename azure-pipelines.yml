@@ -22,7 +22,7 @@ steps:
     runOptions: 'commands'
     commands: |
       echo variables
-      more Downloads\\file.txt
+      more Downloads\\file.config
       echo ejecutar bat
       Downloads\\filebat.bat
       powershell Get-Content -path C:\Users\pocdevops\Downloads\file.config
