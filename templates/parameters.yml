@@ -1,6 +1,3 @@
-# Starter pipeline
-trigger:
-- pruebaPipelines
 parameters:
   - name: 'cambiar'  # defaults for any parameters that aren't specified
     type: boolean
