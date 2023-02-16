@@ -1,6 +1,6 @@
 # Starter pipeline
 trigger:
-- formato1007
+- pruebaPipelines
 
 pool:
   name: 'TestePool'
