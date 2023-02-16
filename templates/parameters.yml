@@ -1,3 +1,5 @@
+pool:
+  name: 'TestePool'
 parameters:
 - name: 'cambiar'  # defaults for any parameters that aren't specified
   type: boolean
