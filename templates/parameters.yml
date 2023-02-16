@@ -21,7 +21,7 @@ steps:
           runOptions: commands
           commands: >
             more ${{parameters.ruta}} #Downloads\\file.config
-            echo ${{parameters.rutaCompleta}}
+            echo ${{parameters.cambiar}}
             (Get-Content -path ${{parameters.rutaCompleta}} -Raw) -replace
             'brown','white'|  Set-Content -Path ${{parameters.rutacompleta}}
             #C:\Users\pocdevops\Downloads\file.config
