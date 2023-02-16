@@ -15,16 +15,16 @@ steps:
   - '${{ if eq(parameters.cambiar, true) }}':
       - script: ''
         displayName: Run a multi-line script
-  - task: SSH@0
-    inputs:
-      sshEndpoint: AgenteWindowsssh
-      runOptions: commands
-      commands: >
-        more ${{parameters.ruta}} #Downloads\\file.config
+      - task: SSH@0
+        inputs:
+          sshEndpoint: AgenteWindowsssh
+          runOptions: commands
+          commands: >
+            more ${{parameters.ruta}} #Downloads\\file.config
+            echo ${{parameters.rutaCompleta}}
+            (Get-Content -path ${{parameters.rutaCompleta}} -Raw) -replace
+            'brown','white'|  Set-Content -Path ${{parameters.rutacompleta}}
+            #C:\Users\pocdevops\Downloads\file.config
 
-        (Get-Content -path ${{parameters.rutaCompleta}} -Raw) -replace
-        'brown','white'|  Set-Content -Path ${{parameters.rutacompleta}}
-        #C:\Users\pocdevops\Downloads\file.config
-
-        more ${{parameters.ruta}}
-      readyTimeout: '20000'
+            more ${{parameters.ruta}}
+          readyTimeout: '20000'
