@@ -9,23 +9,22 @@ parameters:
     type: string
     default: default
 
-pool:
-    name: TestePool
-    steps:
+
+steps:
+  - script: ''
+  - '${{ if eq(parameters.cambiar, true) }}':
       - script: ''
-      - '${{ if eq(parameters.cambiar, true) }}':
-          - script: ''
-            displayName: Run a multi-line script
-      - task: SSH@0
-        inputs:
-          sshEndpoint: AgenteWindowsssh
-          runOptions: commands
-          commands: >
-            more ${{parameters.ruta}} #Downloads\\file.config
+        displayName: Run a multi-line script
+  - task: SSH@0
+    inputs:
+      sshEndpoint: AgenteWindowsssh
+      runOptions: commands
+      commands: >
+        more ${{parameters.ruta}} #Downloads\\file.config
 
-            (Get-Content -path ${{parameters.rutaCompleta}} -Raw) -replace
-            'brown','white'|  Set-Content -Path ${{parameters.rutacompleta}}
-            #C:\Users\pocdevops\Downloads\file.config
+        (Get-Content -path ${{parameters.rutaCompleta}} -Raw) -replace
+        'brown','white'|  Set-Content -Path ${{parameters.rutacompleta}}
+        #C:\Users\pocdevops\Downloads\file.config
 
-            more ${{parameters.ruta}}
-          readyTimeout: '20000'
+        more ${{parameters.ruta}}
+      readyTimeout: '20000'
