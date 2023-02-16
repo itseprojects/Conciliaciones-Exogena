@@ -14,6 +14,6 @@ steps:
 - script: |
 - template: templates/parameters.yml  # Template reference
   parameters:
-    cambiar: 'false'
+    cambiar: false
     ruta: 'Downloads\\file.config'
     rutacompleta: 'C:\Users\pocdevops\Downloads\file.config'
