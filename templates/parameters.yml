@@ -1,5 +1,3 @@
-pool:
-  name: 'TestePool'
 parameters:
 - name: 'cambiar'  # defaults for any parameters that aren't specified
   type: boolean
@@ -10,6 +8,8 @@ parameters:
 - name: 'rutaCompleta'
   type: string
   default: default
+pool:
+  name: 'TestePool'
 steps:
 - script: |
 - ${{ if eq(parameters.cambiar, true) }}:
