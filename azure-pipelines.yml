@@ -20,7 +20,7 @@ steps:
 - template: templates/parameters.yml  # Template reference
   parameters:
     reemplazarenxml: true
-    ruta: 'C:\Users\pocdevops\Downloads\file.config'
+    ruta: 'C:\Users\pocdevops\Documents\PruebaPtos\file2.config'
     estructuraxml: 'configuration.appSettings.add.key'
     estructuraexterna: 'configuration.appSettings'
     item: 0
