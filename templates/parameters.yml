@@ -45,6 +45,7 @@ steps:
       displayName: Modo reemplazar en xml
     - task: SSH@0
       inputs:
+        sshEndpoint: AgenteWindowsssh
         runOptions: 'inline'
         inline: |
           [xml]$myXML =  get-content ${{parameters.ruta}}
