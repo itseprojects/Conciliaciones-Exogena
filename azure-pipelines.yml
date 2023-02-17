@@ -11,7 +11,6 @@ pool:
 # https://aka.ms/yaml
 
 steps:
-- script: |
 - template: templates/parameters.yml  # Template reference
   parameters:
     cambiar: false
