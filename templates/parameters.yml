@@ -50,7 +50,7 @@ steps:
         commands: |
           [xml]$myXML =  get-content ${{parameters.ruta}}
           $myXML.${{parameters.estructuraexterna}}
-          $myXML.${{parameters.estructuraexterna}}.childNodes.Item(${{parameters.item}}).value = '${{parameters.reemplazarpor}}'
+          $myXML.${{parameters.estructuraexterna}}.childNodes.Item(${{parameters.item}}).value = "${{parameters.reemplazarpor}}"
           $myXML.save('${{parameters.ruta}}')
           [xml]$myXML =  get-content ${{parameters.ruta}}
           $myXML.${{parameters.estructuraexterna}}
