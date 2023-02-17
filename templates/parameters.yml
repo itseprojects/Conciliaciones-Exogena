@@ -4,26 +4,31 @@ parameters:
     default: false
   - name: ruta
     type: string
-    default: default
-  - name: rutacompleta
-    type: string
-    default: default
+    default: ''
   - name: reemplazarpor
     type: string
     default: ''
-
+  - name: buscar
+    type: string
+    default: ''
+  - name: noasignado
+    type: string
+    default: ''
 
 steps:
   - '${{ if eq(parameters.cambiar, true) }}':
     - script: ''
-      displayName: reemplazar
+      displayName: Modo reemplazar ${{parameters.buscar}} por ${{parameters.reemplazarpor}} en ${{parameters.ruta}}
     - task: SSH@0
       inputs:
         sshEndpoint: AgenteWindowsssh
         runOptions: commands
         commands: |
-          more ${{parameters.ruta}} #Downloads\\file.config
-          (Get-Content -path ${{parameters.rutacompleta}} -Raw) -replace 'white', '${{parameters.reemplazarpor}}'
-          Set-Content -Path ${{parameters.rutacompleta}}
+          more ${{parameters.ruta}} 
+          (Get-Content -path ${{parameters.ruta}} -Raw) -replace ${{parameters.buscar}}, '${{parameters.reemplazarpor}}'| Set-Content -Path ${{parameters.ruta}}
           more ${{parameters.ruta}}
         readyTimeout: '20000'
+  - '${{ if eq(parameters.cambiar, false) }}':
+    - script: ''
+      displayName: Modo reemplazar no activo
+      
