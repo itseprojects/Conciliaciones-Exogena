@@ -1,30 +1,31 @@
 parameters:
-  - name: cambiar
+  - name: reemplazar
     type: boolean
     default: false
   - name: ruta
     type: string
-    default: default
-  - name: rutaCompleta
+    default: ''
+  - name: buscar
     type: string
-    default: default
+    default: ''
+  - name: reemplazarPor
+    type: string
+    default: ''
 
 
 steps:
   - script: ''
-  - '${{ if eq(parameters.cambiar, true) }}':
+  - '${{ if eq(parameters.reemplazar, true) }}':
       - script: ''
-        displayName: Run a multi-line script
+        displayName: Reemplazar mode
       - task: SSH@0
         inputs:
           sshEndpoint: AgenteWindowsssh
           runOptions: commands
           commands: >
-            more ${{parameters.ruta}} #Downloads\\file.config
-            echo ${{parameters.cambiar}}
-            (Get-Content -path ${{parameters.rutaCompleta}} -Raw) -replace
-            'brown','white'|  Set-Content -Path ${{parameters.rutacompleta}}
-            #C:\Users\pocdevops\Downloads\file.config
-
+            more ${{parameters.ruta}} 
+            echo buscar ${{parameters.buscar}} y reemplazar por ${{parameters.reemplazarPor}}
+            (Get-Content -path ${{parameters.ruta}} -Raw) -replace
+            ${{parameters.buscar}},${{parameters.reemplazarPor}} |  Set-Content -Path ${{parameters.ruta}}
             more ${{parameters.ruta}}
           readyTimeout: '20000'
