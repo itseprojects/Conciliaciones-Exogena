@@ -45,7 +45,7 @@ steps:
       displayName: Modo reemplazar en xml
     - task: SSH@0
       inputs:
-        sshEndpoint: AgenteWindowsssh
+        sshEndpoint: 'AgenteWindowsssh'
         runOptions: 'inline'
         inline: |
           [xml]$myXML =  get-content ${{parameters.ruta}}
@@ -54,7 +54,7 @@ steps:
           $myXML.save('${{parameters.ruta}}')
           [xml]$myXML =  get-content ${{parameters.ruta}}
           $myXML.${{parameters.estructuraexterna}}
-        interpreterCommand: 
+        interpreterCommand: ''
         readyTimeout: '20000'
     - task: SSH@0
       inputs:
@@ -68,5 +68,6 @@ steps:
           $myXML.save('${{parameters.ruta}}')
           [xml]$myXML =  get-content ${{parameters.ruta}}
           $myXML.${{parameters.estructuraexterna}}
+        interpreterCommand: ''
         readyTimeout: '20000'
       
