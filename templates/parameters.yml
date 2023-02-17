@@ -25,7 +25,7 @@ steps:
         runOptions: commands
         commands: |
           more ${{parameters.ruta}} 
-          (Get-Content -path ${{parameters.ruta}} -Raw) -replace ${{parameters.buscar}}, '${{parameters.reemplazarpor}}'| Set-Content -Path ${{parameters.ruta}}
+          (Get-Content -path ${{parameters.ruta}} -Raw) -replace '${{parameters.buscar}}', '${{parameters.reemplazarpor}}'| Set-Content -Path ${{parameters.ruta}}
           more ${{parameters.ruta}}
         readyTimeout: '20000'
   - '${{ if eq(parameters.cambiar, false) }}':
