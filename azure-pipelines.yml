@@ -17,3 +17,11 @@ steps:
     ruta: 'C:\Users\pocdevops\Downloads\file.config'
     buscar: 'white'
     reemplazarpor: 'nuevo'
+- template: templates/parameters.yml  # Template reference
+  parameters:
+    reemplazarenxml: true
+    ruta: 'C:\Users\pocdevops\Downloads\file.config'
+    estructuraxml: 'configuration.appSettings.add.key'
+    estructuraexterna: 'configuration.appSettings'
+    item: 0
+    reemplazarpor: '5050'
