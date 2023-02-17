@@ -14,7 +14,6 @@ steps:
 - script: |
 - template: templates/parameters.yml  # Template reference
   parameters:
-    reemplazar: true
-    ruta: 'C:\Users\pocdevops\Downloads\file.config'
-    buscar: 'white'
-    reemplazarPor: 'pipe'
+    cambiar: true
+    ruta: 'Downloads\\file.config'
+    rutacompleta: 'C:\Users\pocdevops\Downloads\file.config'
