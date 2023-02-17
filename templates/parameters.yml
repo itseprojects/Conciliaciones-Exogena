@@ -68,6 +68,5 @@ steps:
           $myXML.save('${{parameters.ruta}}')
           [xml]$myXML =  get-content ${{parameters.ruta}}
           $myXML.${{parameters.estructuraexterna}}
-        interpreterCommand: ''
         readyTimeout: '20000'
       
