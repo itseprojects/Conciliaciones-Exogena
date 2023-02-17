@@ -46,13 +46,13 @@ steps:
     - task: SSH@0
       inputs:
         sshEndpoint: AgenteWindowsssh
-        runOptions: commands
-        commands: |
-          [xml]$myXML =  get-content ${{parameters.ruta}}; 
+        runOptions: inline
+        inline: |
+          [xml]$myXML =  get-content ${{parameters.ruta}}
           echo $myXML.${{parameters.estructuraexterna}}
-          $myXML.${{parameters.estructuraexterna}}.childNodes.Item(${{parameters.item}}).value = "${{parameters.reemplazarpor}}";
-          $myXML.save('${{parameters.ruta}}');
-          [xml]$myXML =  get-content ${{parameters.ruta}};
+          $myXML.${{parameters.estructuraexterna}}.childNodes.Item(${{parameters.item}}).value = "${{parameters.reemplazarpor}}"
+          $myXML.save('${{parameters.ruta}}')
+          [xml]$myXML =  get-content ${{parameters.ruta}}
           $myXML.${{parameters.estructuraexterna}}
         readyTimeout: '20000'
       
