@@ -48,11 +48,11 @@ steps:
         sshEndpoint: AgenteWindowsssh
         runOptions: commands
         commands: |
-          [xml]$myXML =  get-content ${{parameters.ruta}} 
+          [xml]$myXML =  get-content ${{parameters.ruta}}; 
+          $myXML.${{parameters.estructuraexterna}};
+          $myXML.${{parameters.estructuraexterna}}.childNodes.Item(${{parameters.item}}).value = "${{parameters.reemplazarpor}}";
+          $myXML.save('${{parameters.ruta}}');
+          [xml]$myXML =  get-content ${{parameters.ruta}};
           $myXML.${{parameters.estructuraexterna}}
-          # $myXML.${{parameters.estructuraexterna}}.childNodes.Item(${{parameters.item}}).value = "${{parameters.reemplazarpor}}"
-          # $myXML.save('${{parameters.ruta}}')
-          # [xml]$myXML =  get-content ${{parameters.ruta}}
-          # $myXML.${{parameters.estructuraexterna}}
         readyTimeout: '20000'
       
