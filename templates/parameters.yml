@@ -5,7 +5,7 @@ parameters:
   - name: ruta
     type: string
     default: default
-  - name: rutaCompleta
+  - name: rutacompleta
     type: string
     default: default
   - name: reemplazarpor
@@ -14,17 +14,16 @@ parameters:
 
 
 steps:
-  - script: ''
   - '${{ if eq(parameters.cambiar, true) }}':
-      - script: ''
-        displayName: Run a multi-line script
-      - task: SSH@0
-        inputs:
-          sshEndpoint: AgenteWindowsssh
-          runOptions: commands
-          commands: >
-            more ${{parameters.ruta}} #Downloads\\file.config
-            (Get-Content -path ${{parameters.rutaCompleta}} -Raw) -replace
-            'white','negro'| Set-Content -Path ${{parameters.rutacompleta}}
-            more ${{parameters.ruta}}
-          readyTimeout: '20000'
+    - script: ''
+      displayName: reemplazar
+    - task: SSH@0
+      inputs:
+        sshEndpoint: AgenteWindowsssh
+        runOptions: commands
+        commands: >
+          more ${{parameters.ruta}} #Downloads\\file.config
+          (Get-Content -path ${{parameters.rutacompleta}} -Raw) -replace
+          'white','negro'| Set-Content -Path ${{parameters.rutacompleta}}
+          more ${{parameters.ruta}}
+        readyTimeout: '20000'
