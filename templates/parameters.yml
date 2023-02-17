@@ -26,6 +26,6 @@ steps:
             more ${{parameters.ruta}} 
             echo buscar ${{parameters.buscar}} y reemplazar por ${{parameters.reemplazarPor}}
             (Get-Content -path ${{parameters.ruta}} -Raw) -replace
-            ${{parameters.buscar}},${{parameters.reemplazarPor}} |  Set-Content -Path ${{parameters.ruta}}
+            ${{parameters.buscar}},${{parameters.reemplazarPor}} | Set-Content -Path ${{parameters.ruta}}
             more ${{parameters.ruta}}
           readyTimeout: '20000'
