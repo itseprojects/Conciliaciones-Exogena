@@ -15,6 +15,6 @@ steps:
 - template: templates/parameters.yml  # Template reference
   parameters:
     cambiar: true
-    ruta: 'Downloads\\file.config'
-    rutacompleta: 'C:\Users\pocdevops\Downloads\file.config'
-    reemplazarpor: 'reemplazo'
+    ruta: 'C:\Users\pocdevops\Downloads\file.config'
+    buscar: 'reemplazo'
+    reemplazarpor: 'nuevo'
