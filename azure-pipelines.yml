@@ -16,5 +16,5 @@ steps:
   parameters:
     cambiar: true
     ruta: 'C:\Users\pocdevops\Downloads\file.config'
-    buscar: 'reemplazo'
+    buscar: 'white'
     reemplazarpor: 'nuevo'
