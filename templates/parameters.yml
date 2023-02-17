@@ -24,9 +24,7 @@ steps:
           runOptions: commands
           commands: >
             more ${{parameters.ruta}} #Downloads\\file.config
-            echo ${{parameters.cambiar}}
             (Get-Content -path ${{parameters.rutaCompleta}} -Raw) -replace
-            'white','${{parameters.reemplazarpor}}'|  Set-Content -Path ${{parameters.rutacompleta}}
-            #C:\Users\pocdevops\Downloads\file.config
+            'white','negro'| Set-Content -Path ${{parameters.rutacompleta}}
             more ${{parameters.ruta}}
           readyTimeout: '20000'
