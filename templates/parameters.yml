@@ -47,6 +47,7 @@ steps:
       inputs:
         sshEndpoint: AgenteWindowsssh
         runOptions: inline
+        interpreterCommand: '/bin/sh'
         inline: |
           [xml]$myXML =  get-content ${{parameters.ruta}}
           echo $myXML.${{parameters.estructuraexterna}}
