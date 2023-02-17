@@ -11,6 +11,18 @@ parameters:
   - name: buscar
     type: string
     default: ''
+  - name: reemplazarenxml
+    type: boolean
+    default: false
+  - name: estructuraxml
+    type: string
+    default: ''
+  - name: estructuraexterna
+    type: string
+    default: ''
+  - name: item
+    type: number
+    default: 0
   - name: noasignado
     type: string
     default: ''
@@ -28,7 +40,19 @@ steps:
           (Get-Content -path ${{parameters.ruta}} -Raw) -replace '${{parameters.buscar}}', '${{parameters.reemplazarpor}}'| Set-Content -Path ${{parameters.ruta}}
           more ${{parameters.ruta}}
         readyTimeout: '20000'
-  - '${{ if eq(parameters.cambiar, false) }}':
+  - '${{ if eq(parameters.reemplazarenxml, true) }}':
     - script: ''
-      displayName: Modo reemplazar no activo
+      displayName: Modo reemplazar en xml
+    - task: SSH@0
+      inputs:
+        sshEndpoint: AgenteWindowsssh
+        runOptions: commands
+        commands: |
+          [xml]$myXML =  get-content ${{parameters.ruta}}
+          $myXML.${{parameters.estructuraexterna}}
+          $myXML.${{parameters.estructuraexterna}}.childNodes.Item(${{parameters.item}}.value = '${{parameters.reemplazarpor}}'
+          $myXML.save('${{parameters.ruta}}')
+          [xml]$myXML =  get-content ${{parameters.ruta}}
+          $myXML.${{parameters.estructuraexterna}}
+        readyTimeout: '20000'
       
