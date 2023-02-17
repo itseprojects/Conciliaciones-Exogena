@@ -14,7 +14,7 @@ steps:
 - script: |
 - template: templates/parameters.yml  # Template reference
   parameters:
-    cambiar: true
+    cambiar: false
     ruta: 'C:\Users\pocdevops\Downloads\file.config'
     buscar: 'white'
     reemplazarpor: 'nuevo'
