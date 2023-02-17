@@ -21,12 +21,9 @@ steps:
       inputs:
         sshEndpoint: AgenteWindowsssh
         runOptions: commands
-        commands: >
-          #more ${{parameters.ruta}} #Downloads\\file.config
-          (Get-Content -path ${{parameters.rutacompleta}} -Raw) -replace
-          'white','negro'| 
+        commands: |
+          more ${{parameters.ruta}} #Downloads\\file.config
+          (Get-Content -path ${{parameters.rutacompleta}} -Raw) -replace 'white', ${{parameters.reemplazarpor}}| 
           Set-Content -Path ${{parameters.rutacompleta}}
-          
-          
           more ${{parameters.ruta}}
         readyTimeout: '20000'
