@@ -17,3 +17,4 @@ steps:
     cambiar: true
     ruta: 'Downloads\\file.config'
     rutacompleta: 'C:\Users\pocdevops\Downloads\file.config'
+    reemplazarpor: 'reemplazo'
