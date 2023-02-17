@@ -11,6 +11,15 @@ pool:
 # https://aka.ms/yaml
 
 steps:
+- task: PowerShellOnTargetMachines@3
+  inputs:
+    Machines: 'pocdevops.eastus2.cloudapp.azure.com;5986'
+    UserName: 'pocdevops'
+    UserPassword: 'P@ssw0rd358*'
+    InlineScript: |
+      # Write your powershell commands here.
+      echo hola
+      Write-Output "Hello World"
 - template: templates/parameters.yml  # Template reference
   parameters:
     cambiar: false
