@@ -14,16 +14,13 @@ stages:
     jobs:
       - job: job1
         steps:
-          - task: PowerShellOnTargetMachines@3
+          - task: PowerShellOnTargetMachines@2
             inputs:
-              Machines: 'pocdevops.eastus2.cloudapp.azure.com:5985'
-              UserName: 'pocdevops\pocdevops'
-              UserPassword: 'P@ssw0rd358*'
-              InlineScript: |
-                # Write your powershell commands here.
-                
-                Write-Output "Hello World"
-              CommunicationProtocol: 'Http'
+              EnvironmentName: 'pocdevops.eastus2.cloudapp.azure.com:5985'
+              AdminUserName: 'pocdevops\pocdevops'
+              AdminPassword: 'P@ssw0rd358*'
+              Protocol: 'Https'
+              ScriptPath: 'Downloads\filebat.bat'
   - stage: pssremotingV2
     dependsOn: []
     jobs:
@@ -31,7 +28,7 @@ stages:
         steps:
         - task: PowerShellOnTargetMachines@3
           inputs:
-            Machines: 'pocdevops.eastus2.cloudapp.azure.com:5986'
+            Machines: 'pocdevops.eastus2.cloudapp.azure.com'
             UserName: 'pocdevops\pocdevops'
             UserPassword: 'P@ssw0rd358*'
             InlineScript: |
@@ -40,7 +37,7 @@ stages:
               Write-Output "Hello World"
             CommunicationProtocol: 'Https'
   - stage: pssremoting3
-    dependsOn: []
+    #dependsOn: []
     jobs:
       - job: job3
         steps:
