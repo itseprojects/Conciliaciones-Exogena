@@ -65,4 +65,4 @@ stages:
             estructuraxml: 'configuration.appSettings.add.key'
             estructuraexterna: 'configuration.appSettings'
             item: 0
-            reemplazarpor: '5050'
+            reemplazarpor: '6060'
