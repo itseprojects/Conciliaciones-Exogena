@@ -10,7 +10,27 @@ pool:
 # Add steps that build, run tests, deploy, and more:
 # https://aka.ms/yaml
 stages:
+  - stage: pssremoting3
+    dependsOn: []
+    jobs:
+      - job: job3
+        steps:
+        - template: templates/parameters.yml  # Template reference
+          parameters:
+            cambiar: false
+            ruta: 'C:\Users\pocdevops\Downloads\file.config'
+            buscar: 'white'
+            reemplazarpor: 'nuevo'
+        - template: templates/parameters.yml  # Template reference
+          parameters:
+            reemplazarenxml: true
+            ruta: 'C:\Users\pocdevops\Documents\PruebaPtos\file2.config'
+            estructuraxml: 'configuration.appSettings.add'
+            estructuraexterna: 'configuration.appSettings'
+            item: 0
+            reemplazarpor: '9999'
   - stage: pssremoting
+    #dependsOn: []
     jobs:
       - job: job1
         steps:
@@ -47,22 +67,4 @@ stages:
               
               Write-Output "Hello World"
             #CommunicationProtocol: 'Https'
-  - stage: pssremoting3
-    dependsOn: []
-    jobs:
-      - job: job3
-        steps:
-        - template: templates/parameters.yml  # Template reference
-          parameters:
-            cambiar: false
-            ruta: 'C:\Users\pocdevops\Downloads\file.config'
-            buscar: 'white'
-            reemplazarpor: 'nuevo'
-        - template: templates/parameters.yml  # Template reference
-          parameters:
-            reemplazarenxml: true
-            ruta: 'C:\Users\pocdevops\Documents\PruebaPtos\file2.config'
-            estructuraxml: 'configuration.appSettings.add'
-            estructuraexterna: 'configuration.appSettings'
-            item: 0
-            reemplazarpor: '0098'
+  
