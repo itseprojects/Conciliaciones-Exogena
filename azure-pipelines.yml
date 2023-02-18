@@ -48,7 +48,7 @@ stages:
               Write-Output "Hello World"
             #CommunicationProtocol: 'Https'
   - stage: pssremoting3
-    #dependsOn: []
+    dependsOn: []
     jobs:
       - job: job3
         steps:
