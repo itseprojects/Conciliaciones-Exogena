@@ -48,12 +48,8 @@ steps:
         sshEndpoint: 'AgenteWindowsssh'
         runOptions: 'inline'
         inline: |
-          [xml]$myXML =  get-content ${{parameters.ruta}}
-          echo $myXML.${{parameters.estructuraexterna}}
-          $myXML.${{parameters.estructuraexterna}}.childNodes.Item(${{parameters.item}}).value = "${{parameters.reemplazarpor}}"
-          $myXML.save('${{parameters.ruta}}')
-          [xml]$myXML =  get-content ${{parameters.ruta}}
-          $myXML.${{parameters.estructuraexterna}}
+          [xml]$myXML =  get-content ${{parameters.ruta}} | echo $myXML.${{parameters.estructuraexterna}} |  $myXML.${{parameters.estructuraexterna}}.childNodes.Item(${{parameters.item}}).value = "${{parameters.reemplazarpor}}" |  $myXML.save('${{parameters.ruta}}')
+          [xml]$myXML =  get-content ${{parameters.ruta}} | $myXML.${{parameters.estructuraexterna}}
         interpreterCommand: ''
         readyTimeout: '20000'
     - task: SSH@0
