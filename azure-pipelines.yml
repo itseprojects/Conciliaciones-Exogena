@@ -17,7 +17,11 @@ stages:
           - task: PowerShell@2
             inputs:
               targetType: 'inline'
-              script: 'Enter-PSSession -ComputerName pocdevops.eastus2.cloudapp.azure.com -Credential pocdevops\pocdevops -UseSSL -Port 5986'
+              script: |
+                $password = ConvertTo-SecureString "P@ssw0rd358*" -AsPlainText -Force
+                $user = "pocdevops\pocdevops"
+                $cred = New-Object System.Management.Automation.PSCredential ($user,$password)
+                'Enter-PSSession -ComputerName pocdevops.eastus2.cloudapp.azure.com -Credential $cred -UseSSL -Port 5986'
           - task: PowerShellOnTargetMachines@2
             inputs:
               EnvironmentName: pocdevops.eastus2.cloudapp.azure.com
