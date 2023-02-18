@@ -16,7 +16,7 @@ stages:
         steps:
           - task: PowerShellOnTargetMachines@2
             inputs:
-              EnvironmentName: 'pocdevops.eastus2.cloudapp.azure.com:5986'
+              EnvironmentName: 'pocdevops.eastus2.cloudapp.azure.com'
               AdminUserName: 'pocdevops'
               AdminPassword: 'P@ssw0rd358*'
               Protocol: 'Https'
