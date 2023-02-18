@@ -29,13 +29,13 @@ stages:
         - task: PowerShellOnTargetMachines@3
           inputs:
             Machines: 'pocdevops.eastus2.cloudapp.azure.com'
-            UserName: 'pocdevops\pocdevops'
-            UserPassword: 'P@ssw0rd358*'
+            UserName: pocdevops\pocdevops
+            UserPassword: P@ssw0rd358*
             InlineScript: |
               # Write your powershell commands here.
               
               Write-Output "Hello World"
-            CommunicationProtocol: 'Https'
+            #CommunicationProtocol: 'Https'
   - stage: pssremoting3
     #dependsOn: []
     jobs:
