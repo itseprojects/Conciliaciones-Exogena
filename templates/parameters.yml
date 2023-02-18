@@ -47,9 +47,9 @@ steps:
       inputs:
         sshEndpoint: 'AgenteWindowsssh'
         runOptions: 'commands'
-        commands: >
-          echo ([xml]$myXML =  get-content ${{parameters.ruta}}) -and echo $myXML.${{parameters.estructuraexterna}} -and $myXML.${{parameters.estructuraexterna}}.childNodes.Item(${{parameters.item}}).value = "${{parameters.reemplazarpor}}" -and $myXML.save('${{parameters.ruta}}');
-          ([xml]$myXML =  get-content ${{parameters.ruta}}) -and echo $myXML.${{parameters.estructuraexterna}}
+        commands: |
+          echo ([xml]$myXML =  get-content ${{parameters.ruta}}) -and echo $myXML.${{parameters.estructuraexterna}} -and $myXML.${{parameters.estructuraexterna}}.childNodes.Item(${{parameters.item}}).value="${{parameters.reemplazarpor}}" -and $myXML.save('${{parameters.ruta}}')
+          echo ([xml]$myXML =  get-content ${{parameters.ruta}}) -and echo $myXML.${{parameters.estructuraexterna}}
         interpreterCommand: ''
         readyTimeout: '20000'
     - task: SSH@0
