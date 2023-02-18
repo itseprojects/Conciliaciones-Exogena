@@ -21,7 +21,7 @@ stages:
                 $password = ConvertTo-SecureString "P@ssw0rd358*" -AsPlainText -Force
                 $user = "pocdevops\pocdevops"
                 $cred = New-Object System.Management.Automation.PSCredential ($user,$password)
-                'Enter-PSSession -ComputerName pocdevops.eastus2.cloudapp.azure.com -Credential $cred -UseSSL -Port 5986'
+                'Enter-PSSession -ComputerName pocdevops.eastus2.cloudapp.azure.com -Credential $cred -UseSSL -Port 5986' | dir ;dir
                 dir
                 cd .\PruebaPtos\
                 more .\file2.config
