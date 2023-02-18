@@ -46,8 +46,8 @@ steps:
     - task: SSH@0
       inputs:
         sshEndpoint: 'AgenteWindowsssh'
-        runOptions: 'inline'
-        inline: |
+        runOptions: 'commands'
+        commands: |
           [xml]$myXML =  get-content ${{parameters.ruta}} ; echo $myXML.${{parameters.estructuraexterna}} ;  $myXML.${{parameters.estructuraexterna}}.childNodes.Item(${{parameters.item}}).value = "${{parameters.reemplazarpor}}" ;  $myXML.save('${{parameters.ruta}}')
           [xml]$myXML =  get-content ${{parameters.ruta}} ; $myXML.${{parameters.estructuraexterna}}
         interpreterCommand: ''
