@@ -62,7 +62,7 @@ stages:
           parameters:
             reemplazarenxml: true
             ruta: 'C:\Users\pocdevops\Documents\PruebaPtos\file2.config'
-            estructuraxml: 'configuration.appSettings.add.key'
+            estructuraxml: 'configuration.appSettings.add'
             estructuraexterna: 'configuration.appSettings'
             item: 0
-            reemplazarpor: '6060'
+            reemplazarpor: '1234'
