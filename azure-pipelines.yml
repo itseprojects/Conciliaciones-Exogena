@@ -16,7 +16,7 @@ stages:
         steps:
           - task: PowerShellOnTargetMachines@3
             inputs:
-              Machines: 'pocdevops.eastus2.cloudapp.azure.com'
+              Machines: 'pocdevops.eastus2.cloudapp.azure.com:5985'
               UserName: 'pocdevops\pocdevops'
               UserPassword: 'P@ssw0rd358*'
               InlineScript: |
@@ -25,12 +25,13 @@ stages:
                 Write-Output "Hello World"
               CommunicationProtocol: 'Http'
   - stage: pssremotingV2
+    dependsOn: []
     jobs:
       - job: job2
         steps:
         - task: PowerShellOnTargetMachines@3
           inputs:
-            Machines: 'pocdevops.eastus2.cloudapp.azure.com:5985'
+            Machines: 'pocdevops.eastus2.cloudapp.azure.com:5986'
             UserName: 'pocdevops\pocdevops'
             UserPassword: 'P@ssw0rd358*'
             InlineScript: |
@@ -39,6 +40,7 @@ stages:
               Write-Output "Hello World"
             CommunicationProtocol: 'Https'
   - stage: pssremoting3
+    dependsOn: []
     jobs:
       - job: job3
         steps:
