@@ -27,7 +27,7 @@ stages:
               AuthenticationMechanism: 'Credssp'
   - stage: pssremotingV2
     jobs:
-      - job: job1
+      - job: job2
         steps:
         - task: PowerShellOnTargetMachines@3
           inputs:
@@ -39,9 +39,9 @@ stages:
               
               Write-Output "Hello World"
             CommunicationProtocol: 'Https'
-  - stage: pssremoting
+  - stage: pssremoting3
     jobs:
-      - job: job1
+      - job: job3
         steps:
         - template: templates/parameters.yml  # Template reference
           parameters:
