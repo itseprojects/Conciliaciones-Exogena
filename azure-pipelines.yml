@@ -20,20 +20,10 @@ steps:
       # Write your powershell commands here.
       
       Write-Output "Hello World"
-    CommunicationProtocol: 'Http'
+    CommunicationProtocol: 'Https'
 - task: PowerShellOnTargetMachines@3
   inputs:
-    Machines: 'pocdevops.eastus2.cloudapp.azure.com:5986'
-    UserName: 'pocdevops'
-    UserPassword: 'P@ssw0rd358*'
-    InlineScript: |
-      # Write your powershell commands here.
-      
-      Write-Output "Hello World"
-    CommunicationProtocol: 'Http'
-- task: PowerShellOnTargetMachines@3
-  inputs:
-    Machines: '20.114.250.35;5986'
+    Machines: '20.114.250.35:5986'
     UserName: 'pocdevops'
     UserPassword: 'P@ssw0rd358*'
     InlineScript: |
