@@ -24,7 +24,6 @@ stages:
                 
                 Write-Output "Hello World"
               CommunicationProtocol: 'Http'
-              AuthenticationMechanism: 'Credssp'
   - stage: pssremotingV2
     jobs:
       - job: job2
