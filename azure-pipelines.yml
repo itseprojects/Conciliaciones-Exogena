@@ -16,13 +16,13 @@ stages:
         steps:
           - task: PowerShellOnTargetMachines@2
             inputs:
-              EnvironmentName: 'pocdevops.eastus2.cloudapp.azure.com:5985'
+              EnvironmentName: 'pocdevops.eastus2.cloudapp.azure.com:5986'
               AdminUserName: 'pocdevops\pocdevops'
               AdminPassword: 'P@ssw0rd358*'
               Protocol: 'Https'
               ScriptPath: 'Downloads\filebat.bat'
   - stage: pssremotingV2
-    dependsOn: []
+    #dependsOn: []
     jobs:
       - job: job2
         steps:
