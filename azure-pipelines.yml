@@ -65,4 +65,4 @@ stages:
             estructuraxml: 'configuration.appSettings.add'
             estructuraexterna: 'configuration.appSettings'
             item: 0
-            reemplazarpor: '1234'
+            reemplazarpor: '0098'
