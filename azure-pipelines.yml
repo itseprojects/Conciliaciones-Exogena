@@ -17,7 +17,7 @@ stages:
           - task: PowerShellOnTargetMachines@2
             inputs:
               EnvironmentName: 'pocdevops.eastus2.cloudapp.azure.com:5986'
-              AdminUserName: 'pocdevops\pocdevops'
+              AdminUserName: 'pocdevops'
               AdminPassword: 'P@ssw0rd358*'
               Protocol: 'Https'
               ScriptPath: 'Downloads\filebat.bat'
