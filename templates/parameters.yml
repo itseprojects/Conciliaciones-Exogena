@@ -49,7 +49,7 @@ steps:
         runOptions: 'commands'
         commands: >
           echo ([xml]$myXML =  get-content ${{parameters.ruta}});
-          echo $myXML.${{parameters.estructuraexterna}}
+          echo $myXML.${{parameters.estructuraexterna}}; echo espacio;
           $myXML.${{parameters.estructuraexterna}}.childNodes.Item(${{parameters.item}}).value = "${{parameters.reemplazarpor}}"
           $myXML.save('${{parameters.ruta}}');
           [xml]$myXML =  get-content ${{parameters.ruta}} 
