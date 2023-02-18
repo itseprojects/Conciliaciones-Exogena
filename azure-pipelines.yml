@@ -9,38 +9,51 @@ pool:
 # Start with a minimal pipeline that you can customize to build and deploy your code.
 # Add steps that build, run tests, deploy, and more:
 # https://aka.ms/yaml
-
-steps:
-- task: PowerShellOnTargetMachines@3
-  inputs:
-    Machines: 'pocdevops.eastus2.cloudapp.azure.com'
-    UserName: 'pocdevops\pocdevops'
-    UserPassword: 'P@ssw0rd358*'
-    InlineScript: |
-      # Write your powershell commands here.
-      
-      Write-Output "Hello World"
-    CommunicationProtocol: 'Https'
-- task: PowerShellOnTargetMachines@3
-  inputs:
-    Machines: '20.114.250.35:5986'
-    UserName: 'pocdevops'
-    UserPassword: 'P@ssw0rd358*'
-    InlineScript: |
-      # Write your powershell commands here.
-      echo hola
-      Write-Output "Hello World"
-- template: templates/parameters.yml  # Template reference
-  parameters:
-    cambiar: false
-    ruta: 'C:\Users\pocdevops\Downloads\file.config'
-    buscar: 'white'
-    reemplazarpor: 'nuevo'
-- template: templates/parameters.yml  # Template reference
-  parameters:
-    reemplazarenxml: true
-    ruta: 'C:\Users\pocdevops\Documents\PruebaPtos\file2.config'
-    estructuraxml: 'configuration.appSettings.add.key'
-    estructuraexterna: 'configuration.appSettings'
-    item: 0
-    reemplazarpor: '5050'
+stages:
+  - stage: pssremoting
+    jobs:
+      - job: job1
+        steps:
+          - task: PowerShellOnTargetMachines@3
+            inputs:
+              Machines: 'pocdevops.eastus2.cloudapp.azure.com'
+              UserName: 'pocdevops\pocdevops'
+              UserPassword: 'P@ssw0rd358*'
+              InlineScript: |
+                # Write your powershell commands here.
+                
+                Write-Output "Hello World"
+              CommunicationProtocol: 'Http'
+              AuthenticationMechanism: 'Credssp'
+  - stage: pssremotingV2
+    jobs:
+      - job: job1
+        steps:
+        - task: PowerShellOnTargetMachines@3
+          inputs:
+            Machines: 'pocdevops.eastus2.cloudapp.azure.com:5985'
+            UserName: 'pocdevops\pocdevops'
+            UserPassword: 'P@ssw0rd358*'
+            InlineScript: |
+              # Write your powershell commands here.
+              
+              Write-Output "Hello World"
+            CommunicationProtocol: 'Https'
+  - stage: pssremoting
+    jobs:
+      - job: job1
+        steps:
+        - template: templates/parameters.yml  # Template reference
+          parameters:
+            cambiar: false
+            ruta: 'C:\Users\pocdevops\Downloads\file.config'
+            buscar: 'white'
+            reemplazarpor: 'nuevo'
+        - template: templates/parameters.yml  # Template reference
+          parameters:
+            reemplazarenxml: true
+            ruta: 'C:\Users\pocdevops\Documents\PruebaPtos\file2.config'
+            estructuraxml: 'configuration.appSettings.add.key'
+            estructuraexterna: 'configuration.appSettings'
+            item: 0
+            reemplazarpor: '5050'
