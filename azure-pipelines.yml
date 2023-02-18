@@ -13,8 +13,8 @@ pool:
 steps:
 - task: PowerShellOnTargetMachines@3
   inputs:
-    Machines: 'pocdevops.eastus2.cloudapp.azure.com:5986'
-    UserName: 'pocdevops'
+    Machines: 'pocdevops.eastus2.cloudapp.azure.com'
+    UserName: 'pocdevops\pocdevops'
     UserPassword: 'P@ssw0rd358*'
     InlineScript: |
       # Write your powershell commands here.
