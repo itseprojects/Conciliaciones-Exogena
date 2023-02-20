@@ -15,24 +15,17 @@ stages:
     jobs:
       - job: job3
         steps:
-        - task: CopyFilesOverSSH@0
-          inputs:
-            sshEndpoint: 'AgenteWindowsssh'
-            sourceFolder: '.\filesToCopy'
-            contents: '**'
-            targetFolder: 'Documents\CopiesOfFiles'
-            isWindowsOnTarget: true
-            readyTimeout: '20000'
         - template: templates/parameters.yml  # Template reference
           parameters:
-            cambiar: false
-            ruta: 'C:\Users\pocdevops\Downloads\file.config'
-            buscar: 'white'
-            reemplazarpor: 'nuevo'
-        - template: templates/parameters.yml  # Template reference
-          parameters:
-            reemplazarenxml: true
-            ruta: 'C:\Users\pocdevops\Documents\PruebaPtos\file2.config'
+            renombrarArchivo: 'true'
+            rutaArchivoARenombrar: 'C:\Users\pocdevops\Downloads\file.config'
+            nuevoNombreArchivo: 'fileRenamed'
+
+            copiarCarpeta: 'true'
+            hacerBackup: 'true'
+            rutaCarpetaEnGit: 'filesToCopy'
+            rutaCarpetaServidor: 'Documents\CopiesOfFiles'
+
             estructuraxml: 'configuration.appSettings.add'
             estructuraexterna: 'configuration.appSettings'
             item: 0
