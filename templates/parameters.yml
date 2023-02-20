@@ -67,7 +67,7 @@ steps:
           sshEndpoint: 'AgenteWindowsssh'
           runOptions: 'commands'
           commands: |
-            Copy-item -Force -Recurse -Verbose ${{parameters.rutaCarpetaServidor}} -Destination ${{parameters.rutaCarpetaServidor}}/Backup
+            Copy-item -Force -Recurse -Verbose ${{parameters.rutaCarpetaServidor}} -Destination ${{parameters.rutaCarpetaServidor}}-Backup
           readyTimeout: '20000'
       - task: CopyFilesOverSSH@0
         inputs:
