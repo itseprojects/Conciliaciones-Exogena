@@ -70,13 +70,13 @@ steps:
           Copy-item -Force -Recurse -Verbose ${{parameters.rutaCarpetaServidor}} -Destination ${{parameters.rutaCarpetaServidor}}/Backup
         readyTimeout: '20000'
     - task: CopyFilesOverSSH@0
-          inputs:
-            sshEndpoint: 'AgenteWindowsssh'
-            sourceFolder: '.\${{parameters.rutaCarpetaEnGit}}'
-            contents: '**'
-            targetFolder: '${{parameters.rutaCarpetaServidor}}'
-            isWindowsOnTarget: true
-            readyTimeout: '20000'
+        inputs:
+          sshEndpoint: 'AgenteWindowsssh'
+          sourceFolder: '.\${{parameters.rutaCarpetaEnGit}}'
+          contents: '**'
+          targetFolder: '${{parameters.rutaCarpetaServidor}}'
+          isWindowsOnTarget: true
+          readyTimeout: '20000'
         
         
   - '${{ if eq(parameters.cambiar, true) }}':
