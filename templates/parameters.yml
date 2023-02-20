@@ -79,18 +79,6 @@ steps:
           readyTimeout: '20000'
         
         
-  - '${{ if eq(parameters.cambiar, true) }}':
-    - script: ''
-      displayName: Modo reemplazar ${{parameters.buscar}} por ${{parameters.reemplazarpor}} en ${{parameters.ruta}}
-    - task: SSH@0
-      inputs:
-        sshEndpoint: AgenteWindowsssh
-        runOptions: commands
-        commands: |
-          more ${{parameters.ruta}} 
-          (Get-Content -path ${{parameters.ruta}} -Raw) -replace '${{parameters.buscar}}', '${{parameters.reemplazarpor}}'| Set-Content -Path ${{parameters.ruta}}
-          more ${{parameters.ruta}}
-        readyTimeout: '20000'
   - '${{ if eq(parameters.reemplazarenxml, true) }}':
     - script: ''
       displayName: Modo reemplazar en xml
