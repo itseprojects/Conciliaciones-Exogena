@@ -1,16 +1,27 @@
 parameters:
-  - name: cambiar
+  - name: renombrarArchivo
     type: boolean
     default: false
-  - name: ruta
+  - name: rutaArchivoARenombrar
     type: string
     default: ''
-  - name: reemplazarpor
+  - name: nuevoNombreArchivo
     type: string
     default: ''
-  - name: buscar
+    
+  - name: copiarCarpeta
+    type: boolean
+    default: false
+  - name: rutaCarpetaEnGit
     type: string
     default: ''
+  - name: rutaCarpetaServidor
+    type: string
+    default: ''
+  - name: hacerBackup
+    type: boolean
+    default: true
+    
   - name: reemplazarenxml
     type: boolean
     default: false
@@ -26,8 +37,48 @@ parameters:
   - name: noasignado
     type: string
     default: ''
+  - name: ruta
+    type: string
+    default: ''
+  - name: reemplazarpor
+    type: string
+    default: ''
+  - name: buscar
+    type: string
+    default: ''
 
 steps:
+  - '${{ if eq(parameters.renombrarArchivo, true) }}':
+    - script: ''
+      displayName: Renombrar archivo
+    - task: SSH@0
+      inputs:
+        sshEndpoint: 'AgenteWindowsssh'
+        runOptions: 'commands'
+        commands: |
+          Rename-Item ${{parameters.rutaArchivoARenombrar}} ${{parameters.nuevoNombreArchivo}}
+        readyTimeout: '20000'
+  - '${{ if eq(parameters.copiarCarpeta, true) }}':
+    - script: ''
+      displayName: Copiar carpeta
+    - '${{ if eq(parameters.hacerBackup, true) }}':
+      - task: SSH@0
+      inputs:
+        sshEndpoint: 'AgenteWindowsssh'
+        runOptions: 'commands'
+        commands: |
+          Copy-item -Force -Recurse -Verbose ${{parameters.rutaCarpetaServidor}} -Destination ${{parameters.rutaCarpetaServidor}}/Backup
+        readyTimeout: '20000'
+    - task: CopyFilesOverSSH@0
+          inputs:
+            sshEndpoint: 'AgenteWindowsssh'
+            sourceFolder: '.\${{parameters.rutaCarpetaEnGit}}'
+            contents: '**'
+            targetFolder: '${{parameters.rutaCarpetaServidor}}'
+            isWindowsOnTarget: true
+            readyTimeout: '20000'
+        
+        
   - '${{ if eq(parameters.cambiar, true) }}':
     - script: ''
       displayName: Modo reemplazar ${{parameters.buscar}} por ${{parameters.reemplazarpor}} en ${{parameters.ruta}}
