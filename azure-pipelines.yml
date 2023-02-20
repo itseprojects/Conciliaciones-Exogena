@@ -18,7 +18,7 @@ stages:
         - task: CopyFilesOverSSH@0
           inputs:
             sshEndpoint: 'AgenteWindowsssh'
-            sourceFolder: 'Directory: C:\Agent\_work\2\s\filesToCopy'
+            sourceFolder: '\filesToCopy'
             contents: '**'
             targetFolder: 'Documents\CopiesOfFiles'
             isWindowsOnTarget: true
