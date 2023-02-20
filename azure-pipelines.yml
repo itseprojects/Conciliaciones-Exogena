@@ -15,6 +15,14 @@ stages:
     jobs:
       - job: job3
         steps:
+        - task: CopyFilesOverSSH@0
+          inputs:
+            sshEndpoint: 'AgenteWindowsssh'
+            sourceFolder: 'Directory: C:\Agent\_work\2\s\filesToCopy'
+            contents: '**'
+            targetFolder: 'Documents\CopiesOfFiles'
+            isWindowsOnTarget: true
+            readyTimeout: '20000'
         - template: templates/parameters.yml  # Template reference
           parameters:
             cambiar: false
