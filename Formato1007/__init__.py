@@ -16,6 +16,7 @@ from tempfile import NamedTemporaryFile
 from openpyxl.utils.dataframe import dataframe_to_rows
 import unicodedata
 import numpy as np
+import json
 
 # Datos del blob storage
 account_name = 'itseblobdev' #'probepython'
@@ -38,7 +39,9 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         HeaderHojaDB = 0
         nombreHojaDB="Sheet1"
         exito = WorkSiesa(Cliente,balanceFile,blob_name_DB)
-    else: exito = "Tipo de balance no implementado"
+    else: 
+        dicToReturn = {"error":"Tipo de balance no implementado"}
+        exito = json.dumps(dicToReturn) 
 
     return func.HttpResponse(f"{exito}", status_code=200 )
 
@@ -46,7 +49,6 @@ def WorkSiesa(container_name,balanceFile,blob_name_DB):
     HeaderHojaBalance=11
     nombreHojaBalance= "Hoja 1"
     # ColumnaValorIngreso = "2022/08" if balanceFile=='BALANCE ENERO A AGOSTO 2022.xlsx' else "2021/12"
-    logging.info('Python HTTP trigger function processed a request.')
     try:
         blob_service_client = BlobServiceClient(account_url = f'https://{account_name }.blob.core.windows.net/', credential = account_key)
         try:
@@ -91,8 +93,13 @@ def WorkSiesa(container_name,balanceFile,blob_name_DB):
         PutColorsAnsSaveToBlob(Formato1007,container_name)
 
     except Exception as e:
-        return f"!! Ocurrió un error en la ejecución. \n\t {e} "
-    return f'ruta:https://{account_name}.blob.core.windows.net/{container_name}/{blob_name_to_save}'
+        dicToReturn = {"error":f'{e}'}
+        return json.dumps(dicToReturn)
+    dicToReturn = {
+        "error":"ninguno",
+        "ruta":f'https://{account_name}.blob.core.windows.net/{container_name}/{blob_name_to_save}',
+        "valorIngresos":ceil(ValorTotalIngresos*-1)}
+    return json.dumps(dicToReturn)
 
 # Función que agrega color según el tipo de contenido de las columnas y guarda archivo excel en el Blob Storage,
 #   Asigna el color rojo para advertir sobre datos relacionados de la base de datos de usuarios y amarillo para datos relacionados con el balance

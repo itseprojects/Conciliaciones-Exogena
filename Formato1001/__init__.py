@@ -20,6 +20,7 @@ from tempfile import NamedTemporaryFile
 from openpyxl.utils.dataframe import dataframe_to_rows
 import numpy as np
 import unicodedata
+import json
 
 # Datos del blob storage
 account_name = 'itseblobdev' #'probepython'
@@ -47,8 +48,8 @@ conceptos = {"5055":[515500,525500,725500],
             "5011":[510574,510577,520568,520569],
             "5012":[510580,520570],
             "5013":[],
-            "5014":[],
-            "5015":[521505,521508,530550,721500],
+            "5014":[], 
+            "5015":[511505,511508,521505,521535,521508,530550,721500],
             "5066":[],
             "5058":[512500,522500],
             "5060":[],
@@ -92,7 +93,7 @@ conceptos = {"5055":[515500,525500,725500],
              }
 
 # Columnas adicionales
-ivaColumnaO = [511535,521570]
+ivaColumnaO = [511535,521570,511537,521571]
 pagoNoDeducible = {"5016":[529521,530555,532005,539520,539581,539582]}
 # No se presenta retenciones para el id:800197268 => aduanas 
 # va en cualquier concepto (el primero por default) que esté el tercero
@@ -119,7 +120,9 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         HeaderHojaDB = 0
         nombreHojaDB="Sheet1"
         exito = WorkSiesa(Cliente,balanceFile,blob_name_DB)
-    else: exito = "Tipo de balance no implementado"
+    else: 
+        dicToReturn = {"error":"Tipo de balance no implementado"}
+        exito = json.dumps(dicToReturn) 
 
     return func.HttpResponse(f"{exito}", status_code=200 )
 
@@ -162,10 +165,10 @@ def WorkSiesa(container_name,balanceFile,blob_name_DB):
         # leer base de datos de usuarios y municipios de Colombia
         blob_client = blob_service_client.get_blob_client(container = container_name, blob = blob_name_DB)
         downloader = blob_client.download_blob()
-        dbUsers = pd.read_excel(downloader.readall(), sheet_name="Sheet1", header=0)
+        dbUsers = pd.read_excel(downloader.readall(), sheet_name="Sheet1", header=0)#,engine='openpyxl')
         blob_client = blob_service_client.get_blob_client(container = container_name, blob = MupiosenBlob)
         downloader = blob_client.download_blob()
-        dbMupios = pd.read_excel(downloader.readall(), sheet_name="municipios", header=0,converters={'Código Municipio':str,'Código Departamento':str})
+        dbMupios = pd.read_excel(downloader.readall(), sheet_name="municipios", header=0,converters={'Código Municipio':str,'Código Departamento':str},engine='openpyxl')
 
         TercerosPorConcepto = BuscarId(TercerosPorConcepto,dbUsers,dbMupios)
         TercerosPorConcepto["Pais"]= np.where(TercerosPorConcepto["Código depto"]=="","",TercerosPorConcepto["Pais"])
@@ -179,12 +182,73 @@ def WorkSiesa(container_name,balanceFile,blob_name_DB):
                                                                            (TercerosPorConcepto['Retención en la fuente practicada IVA régimen común']==0) &
                                                                            (TercerosPorConcepto['Retención en la fuente practicada IVA no domiciliados']==0)].index)
         TercerosPorConcepto.rename(columns = {'Ingresos Brutos Recibidos':'Pago o abono en cuenta deducible'}, inplace = True)
+        TercerosPorConcepto = TercerosPorConcepto.drop(TercerosPorConcepto[(TercerosPorConcepto['Numero de identificacion']=='Generico') & ((TercerosPorConcepto['Concepto']=='5007') | (TercerosPorConcepto['Concepto']=='5008'))].index) # eliminar registro para este #id
+        TercerosPorConcepto['Pago o abono en cuenta deducible'] = TercerosPorConcepto['Pago o abono en cuenta deducible'].apply(np.ceil)
+        TercerosPorConcepto['Pago o abono en cuenta no deducible'] = TercerosPorConcepto['Pago o abono en cuenta no deducible'].apply(np.ceil)
+        TercerosPorConcepto['Iva mayor valor del costo o gasto deducible'] = TercerosPorConcepto['Iva mayor valor del costo o gasto deducible'].apply(np.ceil)
+        TercerosPorConcepto['Iva mayor valor del costo o gasto no deducible'] = TercerosPorConcepto['Iva mayor valor del costo o gasto no deducible'].apply(np.ceil)
+        TercerosPorConcepto['Retención en la fuente practicada en renta'] = TercerosPorConcepto['Retención en la fuente practicada en renta'].apply(np.ceil)
+        TercerosPorConcepto['Retención en la fuente asumida en renta'] = TercerosPorConcepto['Retención en la fuente asumida en renta'].apply(np.ceil)
+        TercerosPorConcepto['Retención en la fuente practicada IVA régimen común'] = TercerosPorConcepto['Retención en la fuente practicada IVA régimen común'].apply(np.ceil)
+        TercerosPorConcepto['Retención en la fuente practicada IVA no domiciliados'] = TercerosPorConcepto['Retención en la fuente practicada IVA no domiciliados'].apply(np.ceil)
         
-        PutColorsAnsSaveToBlob(TercerosPorConcepto,container_name)
+        # PutColorsAnsSaveToBlob(TercerosPorConcepto,container_name)
+        jsonComprobation = makeComprobations(TercerosPorConcepto,container_name,DatosSeparados,ColumnaValorIngreso)
         
     except Exception as e:
-        return f"!! Ocurrió un error en la ejecución. \n\t {e} "
-    return f'ruta:https://{account_name}.blob.core.windows.net/{container_name}/{blob_name_to_save}'
+        dicToReturn = {"error":f"{e}"}
+        return json.dumps(dicToReturn)
+    return jsonComprobation
+
+def makeComprobations(TercerosPorConcepto,container_name,DatosSeparados,ColumnaValorIngreso):
+    tablaParaComprobar = ExtraerCtas(DatosSeparados)
+    tablaParaComprobar['Formato'] = 0
+    # 14 activos movibles
+    HonB = DatosSeparados[(DatosSeparados['NIT']=="")&(DatosSeparados['NumeroCuenta']==14)].iloc[:,ColumnaValorIngreso].sum()
+    HonF = TercerosPorConcepto[(TercerosPorConcepto['Concepto']=='5007')].loc[:,'Pago o abono en cuenta deducible'].sum()
+    tablaParaComprobar["Formato"]= np.where(tablaParaComprobar["NumeroCuenta"]==14,HonF,tablaParaComprobar["Formato"])
+    # buscar prop planta 15
+    HonB = DatosSeparados[(DatosSeparados['NIT']=="")&(DatosSeparados['NumeroCuenta']==15)].iloc[:,ColumnaValorIngreso].sum()
+    HonF = TercerosPorConcepto[(TercerosPorConcepto['Concepto']=='5008')].loc[:,'Pago o abono en cuenta deducible'].sum()
+    tablaParaComprobar["Formato"]= np.where(tablaParaComprobar["NumeroCuenta"]==15,HonF,tablaParaComprobar["Formato"])
+    # buscar gastos 5
+    
+    # buscar gastos op 51
+    # Beneficios a empleados
+    # Honorarios
+    HonB = DatosSeparados[(DatosSeparados['NIT']=="")&(DatosSeparados['NumeroCuenta']==5110)].iloc[:,ColumnaValorIngreso].sum()
+    HonF = TercerosPorConcepto[(TercerosPorConcepto['Concepto']=='5002')].loc[:,'Pago o abono en cuenta deducible'].sum()
+    tablaParaComprobar["Formato"]= np.where(tablaParaComprobar["NumeroCuenta"]==5110,HonF,tablaParaComprobar["Formato"])
+    # Impuestos
+    # Arrendamientos 
+    ArrB = ceil(DatosSeparados[(DatosSeparados['NIT']=="")&(DatosSeparados['NumeroCuenta']==5120)].iloc[:,ColumnaValorIngreso].sum())
+    ArrF = ceil(TercerosPorConcepto[(TercerosPorConcepto['Concepto']=='5005')].loc[:,'Pago o abono en cuenta deducible'].sum())
+    tablaParaComprobar["Formato"]= np.where(tablaParaComprobar["NumeroCuenta"]==5120,ArrF,tablaParaComprobar["Formato"])
+    # Seguros 
+    SegB = DatosSeparados[(DatosSeparados['NIT']=="")&(DatosSeparados['NumeroCuenta']==5130)].iloc[:,ColumnaValorIngreso].sum()
+    SegF = TercerosPorConcepto[(TercerosPorConcepto['Concepto']=='5005')].loc[:,'Pago o abono en cuenta deducible']#.sum()
+    # Servicios 
+    # Gastos legales 
+    # Mantenimiento Adecuaciones 
+    # Gastos de viaje 
+    # Depreciaciones 
+    # Diversos
+    print(f'Honorarios:\nBalance: {HonB}\nFormato: {HonF}\n'+
+          f'Arrendamientos:\nBalance: {ArrB}\nFormato: {ArrF}\n'+
+          f'Seguro:\nBalance: {SegB}\nFormato: {SegF}\n')
+    print(tablaParaComprobar[(tablaParaComprobar['Formato']>0)])
+    
+    # buscar gastos no operacionales 53
+    # data = UnificarClientesPorCuenta(DatosSeparados,5305,5306,"Ingresos Brutos Recibidos",ColumnaValorIngreso)
+    # buscar impuestos 54
+    # buscar costos de pro 7
+    dicToReturn = {
+        "error":"ninguno",
+        "ruta":f'https://{account_name}.blob.core.windows.net/{container_name}/{blob_name_to_save}',
+        "ArrendamientoB":ArrB,
+        "ArrendamientoF":ArrF
+        }
+    return json.dumps(dicToReturn)
 
 # Función que agrega color según el tipo de contenido de las columnas y guarda archivo excel en el Blob Storage,
 #   Asigna el color rojo para advertir sobre datos relacionados de la base de datos de usuarios y amarillo para datos relacionados con el balance
@@ -193,15 +257,6 @@ def WorkSiesa(container_name,balanceFile,blob_name_DB):
 #       account_name, account_key, blob_name_to_save
 #   retorna: none
 def PutColorsAnsSaveToBlob(Datos,container_name):
-    Datos['Pago o abono en cuenta deducible'] = Datos['Pago o abono en cuenta deducible'].apply(np.ceil)
-    Datos['Pago o abono en cuenta no deducible'] = Datos['Pago o abono en cuenta no deducible'].apply(np.ceil)
-    Datos['Iva mayor valor del costo o gasto deducible'] = Datos['Iva mayor valor del costo o gasto deducible'].apply(np.ceil)
-    Datos['Iva mayor valor del costo o gasto no deducible'] = Datos['Iva mayor valor del costo o gasto no deducible'].apply(np.ceil)
-    Datos['Retención en la fuente practicada en renta'] = Datos['Retención en la fuente practicada en renta'].apply(np.ceil)
-    Datos['Retención en la fuente asumida en renta'] = Datos['Retención en la fuente asumida en renta'].apply(np.ceil)
-    Datos['Retención en la fuente practicada IVA régimen común'] = Datos['Retención en la fuente practicada IVA régimen común'].apply(np.ceil)
-    Datos['Retención en la fuente practicada IVA no domiciliados'] = Datos['Retención en la fuente practicada IVA no domiciliados'].apply(np.ceil)
-    
     fillOrange = PatternFill(patternType='solid', fgColor='FCBA03')
     fillRed = PatternFill(patternType='solid', fgColor='EE1111')
     # FilePath = "balance 2021 Exeltis con terceros.xlsx"
@@ -615,17 +670,17 @@ def BuscarId(dfBalance,bd,dbMupios):
 # uso:
 #       df = ExtraerCtas()
 #       GuardarExcel(df, 'soloCtas')
-# def ExtraerCtas():
-#     HeaderHojaBalance=11
-#     nombreHojaBalance= "Hoja 1"
+def ExtraerCtas(Datos):
+    # HeaderHojaBalance=11
+    # nombreHojaBalance= "Hoja 1"
     
-#     try:
-#         Datos = pd.read_excel(FilePath, sheet_name=nombreHojaBalance, header=HeaderHojaBalance)
-#         Datos = Datos[~Datos["             Descripción                                "].isnull()]
-#         Datos1 = Datos.iloc[:,[0,1]]
-#         # print(Datos1)
-#         return Datos1
-#     except : False
+    try:
+        # Datos = pd.read_excel(FilePath, sheet_name=nombreHojaBalance, header=HeaderHojaBalance)
+        Datos =  Datos[Datos['NumeroCuenta'].apply( lambda x: str(x).startswith(('14','15','5','6','7')) and x<10000)]
+        Datos = Datos.iloc[:,[1,4,8]]
+        print(Datos)
+        return Datos
+    except : False
 
 
 # extras:
