@@ -1,0 +1,19 @@
+# Starter pipeline
+trigger:
+- pruebaPipelines
+
+pool:
+  name: 'TestePool'
+  #vmImage: ubuntu-latest
+
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+steps:
+- script: |
+- template: templates/parameters.yml  # Template reference
+  parameters:
+    cambiar: 'true'
+    ruta: 'Downloads\\file.config'
+    rutacompleta: 'C:\Users\pocdevops\Downloads\file.config'
