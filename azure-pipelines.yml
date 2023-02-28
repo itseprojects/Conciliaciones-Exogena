@@ -13,7 +13,7 @@ stages:
   - stage: pssremoting3
     dependsOn: []
     jobs:
-      - job: job3
+      - job: job1
         steps:
         - template: templates/parameters.yml  # Template reference
           parameters:
@@ -30,42 +30,35 @@ stages:
             estructuraexterna: 'configuration.appSettings'
             item: 0
             reemplazarpor: '9999'
+
   - stage: pssremoting
-    #dependsOn: []
-    jobs:
-      - job: job1
-        steps:
-          - task: PowerShell@2
-            inputs:
-              targetType: 'inline'
-              script: |
-                $password = ConvertTo-SecureString "P@ssw0rd358*" -AsPlainText -Force
-                $user = "pocdevops\pocdevops"
-                $cred = New-Object System.Management.Automation.PSCredential ($user,$password)
-                'Enter-PSSession -ComputerName pocdevops.eastus2.cloudapp.azure.com -Credential $cred -UseSSL -Port 5986' ;dir
-                dir
-                cd .\PruebaPtos\
-                more .\file2.config
-          - task: PowerShellOnTargetMachines@2
-            inputs:
-              EnvironmentName: pocdevops.eastus2.cloudapp.azure.com
-              AdminUserName: .\pocdevops
-              AdminPassword: P@ssw0rd358*
-              Protocol: 'Https'
-              ScriptPath: 'Downloads\filebat.bat'
-  - stage: pssremotingV2
     #dependsOn: []
     jobs:
       - job: job2
         steps:
-        - task: PowerShellOnTargetMachines@3
-          inputs:
-            Machines: 'pocdevops.eastus2.cloudapp.azure.com'
-            UserName: pocdevops\pocdevops
-            UserPassword: P@ssw0rd358*
-            InlineScript: |
+          #- script: ''
+          - task: SSH@0
+            inputs:
+              sshEndpoint: 'AgenteWindowsssh'
+              runOptions: 'commands'
+              commands: |
+                iisreset
+              readyTimeout: '20000'
+        displayName: Reset IIS
+  
+  #- stage: pssremoting
+    #dependsOn: []
+    #jobs:
+      #- job: job2
+        #steps:
+        #- task: PowerShellOnTargetMachines@3
+          #inputs:
+            #Machines: 'pocdevops.eastus2.cloudapp.azure.com'
+            #UserName: pocdevops\pocdevops
+            #UserPassword: P@ssw0rd358*
+            #InlineScript: |
               # Write your powershell commands here.
               
-              Write-Output "Hello World"
+              #Write-Output "Hello World"
             #CommunicationProtocol: 'Https'
   
