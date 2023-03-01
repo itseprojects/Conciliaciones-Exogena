@@ -19,7 +19,7 @@ stages:
           parameters:
             renombrarArchivo: 'true'
             rutaArchivoARenombrar: 'C:\Users\pocdevops\Downloads\file.config'
-            nuevoNombreArchivo: 'fileRenamed2.config'
+            nuevoNombreArchivo: 'fileRenamedXYZ.config'
 
             copiarCarpeta: 'true'
             hacerBackup: 'true'
