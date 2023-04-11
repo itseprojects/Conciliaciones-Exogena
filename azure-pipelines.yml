@@ -2,6 +2,13 @@
 trigger:
 - pruebaPipelines
 
+schedules:
+  - cron: '40 15 * * Mon-Fri'
+    displayName: M-F 10:40 daily build
+    branches:
+      include:
+      - pruebaPipelines
+      
 pool:
   name: 'TestePool'
   #vmImage: ubuntu-latest
