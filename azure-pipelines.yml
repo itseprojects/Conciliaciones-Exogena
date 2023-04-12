@@ -1,6 +1,6 @@
 # Starter pipeline
-trigger:
-- pruebaPipelines
+#trigger:
+#- pruebaPipelines
 
 pool:
   name: 'TestePool'
