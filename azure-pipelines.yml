@@ -1,6 +1,6 @@
 # Starter pipeline
-trigger:
-- pruebaPipelines
+# trigger:
+#- pruebaPipelines
 
 schedules:
   - cron: '48 15 * * Mon-Fri'
