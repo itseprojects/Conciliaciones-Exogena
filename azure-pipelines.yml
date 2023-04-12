@@ -1,7 +1,7 @@
 # Starter pipeline
 # trigger:
 #- pruebaPipelines
-
+# new cooment
 schedules:
   - cron: '10 19 * * Mon-Fri'
     displayName: M-F 10:40 daily build
