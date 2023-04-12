@@ -3,7 +3,7 @@
 #- pruebaPipelines
 
 schedules:
-  - cron: '48 15 * * Mon-Fri'
+  - cron: '10 19 * * Mon-Fri'
     displayName: M-F 10:40 daily build
     branches:
       include:
