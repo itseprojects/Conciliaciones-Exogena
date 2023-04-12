@@ -1,5 +1,5 @@
 # Starter pipeline
-# trigger:
+trigger: none
 #- pruebaPipelines
 # new coment
 schedules:
