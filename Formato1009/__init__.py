@@ -85,9 +85,13 @@ def WorkSiesa(container_name,balanceFile,blob_name_DB,idEjecucion,idProcedencia)
         DatosSeparados = separarCuentas(Datos)
         ColumnaValorIngreso += 3    # separaCuentas añade 3 columnas
         
+        # Leer base de datos de usuarios
+        blob_client = blob_service_client.get_blob_client(container = container_name, blob = blob_name_DB)
+        downloader = blob_client.download_blob()
+        dbUsers = pd.read_excel(downloader.readall(), sheet_name="Sheet1", header=0)#,engine='openpyxl')
         # Elaborar formato parte contable
-        TercerosPorConcepto = GetClientsByConcept(DatosSeparados,ColumnaValorIngreso)
-        # Leer base de datos de usuarios y municipios de Colombia
+        TercerosPorConcepto = GetClientsByConcept(DatosSeparados,ColumnaValorIngreso,dbUsers[['Código','Tipo de tercero']])
+        # Leer municipios de Colombia
         blob_client = blob_service_client.get_blob_client(container = container_name, blob = blob_name_DB)
         downloader = blob_client.download_blob()
         dbUsers = pd.read_excel(downloader.readall(), sheet_name="Sheet1", header=0)#,engine='openpyxl')
@@ -104,11 +108,11 @@ def WorkSiesa(container_name,balanceFile,blob_name_DB,idEjecucion,idProcedencia)
         TercerosPorConcepto["Pais"]= np.where(TercerosPorConcepto["Código depto"]=="","",TercerosPorConcepto["Pais"])
         TercerosPorConcepto["Razón social"]= np.where(TercerosPorConcepto["Primer apellido"]!="","",TercerosPorConcepto["Razón social"])
         TercerosPorConcepto = TercerosPorConcepto.drop(TercerosPorConcepto[(TercerosPorConcepto['Ingresos Brutos Recibidos']==0)].index)
-        TercerosPorConcepto['Ingresos Brutos Recibidos'] = TercerosPorConcepto['Ingresos Brutos Recibidos'].apply(np.ceil)
+        TercerosPorConcepto['Ingresos Brutos Recibidos'] = TercerosPorConcepto['Ingresos Brutos Recibidos'].apply(np.round)
+        TercerosPorConcepto["Ingresos Brutos Recibidos"]= TercerosPorConcepto["Ingresos Brutos Recibidos"]*-(1)
         TercerosPorConcepto.rename(columns = {'Ingresos Brutos Recibidos':'Saldo a CXC a 31 de diciembre'}, inplace = True)
         
-        
-        saveToBD(TercerosPorConcepto["Saldo a CXC a 31 de diciembre"].sum(),idEjecucion,idProcedencia)#,rentaPath)    
+        saveToBD(TercerosPorConcepto["Saldo a CXC a 31 de diciembre"].sum(),idEjecucion,idProcedencia,DatosSeparados[(DatosSeparados['NumeroCuenta']==2)].sum()[ColumnaValorIngreso]*-1)#,rentaPath)    
         # Ajustar parte estética y almacenar en el BLob Storage
         PutColorsAnsSaveToBlob(TercerosPorConcepto,container_name)
         dicToReturn = {
@@ -121,7 +125,7 @@ def WorkSiesa(container_name,balanceFile,blob_name_DB,idEjecucion,idProcedencia)
     return json.dumps(dicToReturn)
 
 
-def saveToBD(valorHaxa,idEjecucion,idProcedencia):#,rentaPath):
+def saveToBD(valorHaxa,idEjecucion,idProcedencia,valorContable):#,rentaPath):
     """
     Almacena las comprobaciones en BD.
     Args:
@@ -149,16 +153,16 @@ def saveToBD(valorHaxa,idEjecucion,idProcedencia):#,rentaPath):
     cnxn = pyodbc.connect(f'DRIVER={driver};SERVER={server}'+';DATABASE='+database+';ENCRYPT=yes;UID='+username+';PWD='+ password)
     cursor = cnxn.cursor()
     
-    condicion = 'id_ejecucion = ' + idEjecucion +"AND id_procedencia = " + idProcedencia
-    sql = "DELETE FROM Diferencias" + " WHERE " + condicion
-    cursor.execute(sql)
-    cnxn.commit()
+    # condicion = f'id_ejecuccion = {idEjecucion} AND id_procedencia = {idProcedencia}'
+    # sql = "DELETE FROM Diferencias" + " WHERE " + condicion
+    # cursor.execute(sql)
+    # cnxn.commit()
       
     insert_stmt = (
-                    "INSERT INTO Diferencias (id_ejecuccion, id_procedencia, nombre_diferencia, numeroc, observaciones,valor_HAXA) \
-                    VALUES (?,?,?,?,?,?)"
+                    "INSERT INTO Diferencias (id_ejecuccion, id_procedencia, nombre_diferencia,comprobacion, numeroc, observaciones,valor_HAXA) \
+                    VALUES (?,?,?,?,?,?,?)"
                     )
-    data = (idEjecucion,idProcedencia,"Total","13","",valorHaxa)
+    data = (idEjecucion,idProcedencia,"Total Contable",valorContable,"2","",valorHaxa)
     # insertar registro en bd
     cursor.execute(insert_stmt, data)
     cnxn.commit()
@@ -370,7 +374,7 @@ def separarCuentas(df):
     df.insert(1,"NumeroCuenta",VectorCuentas)
     return df
 
-def GetClientsByConcept(DatosSeparados, ColumnaValorIngreso):
+def GetClientsByConcept(DatosSeparados, ColumnaValorIngreso,dbUsers):
     '''
     Obtiene los terceros a partir del diccionario conceptos.
     Args:
@@ -384,16 +388,17 @@ def GetClientsByConcept(DatosSeparados, ColumnaValorIngreso):
     conceptos = {"2201":[220500,230500,231000], 
                 "2202":[231500],
                 "2203":[210000], # todo del 21
-                "2204":[240000], # todo del 24 a nombre de direccion de im Dian y secretaria de Hacienda
-                "2214":[], # 2510, buscarla por nombre cesant y empiece por 2
-                "2215":[250500,251500,252500,253000],
+                "2204":[240000,248800], # todo del 24 a nombre de direccion de im Dian salvo el 2488: secretaria de Hacienda
+                "2214":[251000], # 2510, buscarla por nombre cesant y empiece por 2
+                "2215":[250500,251500,252500,253000], 
                 "2207":[],
                 "2209":[],
                 "2208":[], 
                 "2211":[],
                 "2212":[],
                 "2213":[],
-                "2206":[230000] # todo 23 menos 2305-2310    +26 y 27
+                "2206":[230000,260000,270000], # todo 23 menos 2305-2315    +26 y 27
+                "22xx":[254000] # 254000,: usado, si es natural en conc 2215, de lo contrario va para el conc 2214
     } 
     TercerosPorConcepto = pd.DataFrame()
     TercerosPorConcepto['Concepto'] = None
@@ -408,10 +413,20 @@ def GetClientsByConcept(DatosSeparados, ColumnaValorIngreso):
         soloConcepto['Ingresos Brutos Recibidos'] = None
         for conc in conceptos[clave]:
             if conc==230000 and clave=="2206":
-                data1 = UnificarClientesPorCuenta(DatosSeparados,conc,230500 ,"Ingresos Brutos Recibidos",ColumnaValorIngreso)
-                data2 = UnificarClientesPorCuenta(DatosSeparados,230600,240000 ,"Ingresos Brutos Recibidos",ColumnaValorIngreso)
-                data = pd.concat([data1, data2], ignore_index=True ).groupby(['Numero de identificacion','Razón social']).sum(numeric_only=True).reset_index()
-            
+                # exceptuar las ctas de otros conceptos: 2305,2310,2315
+                #data1 = UnificarClientesPorCuenta(DatosSeparados,conc,230500 ,"Ingresos Brutos Recibidos",ColumnaValorIngreso)
+                data = UnificarClientesPorCuenta(DatosSeparados,231600,240000 ,"Ingresos Brutos Recibidos",ColumnaValorIngreso)
+                #data = pd.concat([data1, data2], ignore_index=True ).groupby(['Numero de identificacion','Razón social']).sum(numeric_only=True).reset_index()
+            elif clave=='22xx':
+                data = UnificarClientesPorCuenta(DatosSeparados,conc,260000 ,"Ingresos Brutos Recibidos",ColumnaValorIngreso)
+            elif conc==240000 and clave=="2204":
+                data = UnificarClientesPorCuenta(DatosSeparados,conc,248800 ,"Ingresos Brutos Recibidos",ColumnaValorIngreso)
+                data['Numero de identificacion'] = 800197268
+                data['Razón social'] = "DIRECCION DE IMPUESTOS Y ADUANAS NACIONALES"
+            elif conc==248800 and clave=="2204":
+                data = UnificarClientesPorCuenta(DatosSeparados,conc,248900 ,"Ingresos Brutos Recibidos",ColumnaValorIngreso)
+                data['Numero de identificacion'] = 899999061
+                data['Razón social'] = "SECRETARIA DISTRITAL DE HACIENDA"
             else:
                 data = UnificarClientesPorCuenta(DatosSeparados,conc,(conc+ (10000 if str(conc).endswith("0000") else 100 if str(conc).endswith("00") else 1)),"Ingresos Brutos Recibidos",ColumnaValorIngreso)
                 if clave=="2204":
@@ -422,8 +437,30 @@ def GetClientsByConcept(DatosSeparados, ColumnaValorIngreso):
         # Agrega todos los terceros únicos en el concepto al df de salida
         if ~soloConcepto.empty: 
             soloConcepto.insert(0,'Concepto', clave)
+            # Condiciones especiales
+            if clave=='22xx':
+                soloConcepto['Concepto'] = soloConcepto['Numero de identificacion'].apply(get_tipo_persona,args=(dbUsers,))
+                clave = '2015'
             TercerosPorConcepto = pd.concat([TercerosPorConcepto, soloConcepto],ignore_index=True)
     return TercerosPorConcepto  
+
+def get_tipo_persona(numero_identificacion,dbUsers):
+    """
+    Busca el número de identificación en el DataFrame dbUsers y retorna la posición 2 del registro correspondiente,
+    si es que existe.
+
+    Args:
+        numero_identificacion (str): Número de identificación a buscar.
+
+    Returns:
+        str: La posición 2 del registro correspondiente en el DataFrame dbUsers, o "No encontrado" si no existe.
+    """
+    dbUsers['Código'] = dbUsers['Código'].apply(lambda x: x.strip())
+    registro = dbUsers.loc[dbUsers['Código'] == numero_identificacion.strip()]
+    persona = registro.iloc[0, 1] if not registro.empty else "No encontrado"
+    if persona.upper() == 'PERSONA NATURAL':
+        return "2215"
+    else: return "2214"
 
 def UnificarClientesPorCuenta(df,limiteInferiorCta,LimiteSuperiorCta,nombreDatoColumna,ColumnaValorIngreso):
     '''
@@ -449,7 +486,7 @@ def UnificarClientesPorCuenta(df,limiteInferiorCta,LimiteSuperiorCta,nombreDatoC
         VectorIdentificacion.append(df[df['Razón social']==cliente]['NIT'].iloc[0])
         VectorNombres.append(cliente)
         VectorTotales.append(total)
-        
+    
     datosPorCliente.insert(0,"Razón social",VectorNombres)
     datosPorCliente.insert(0,"Numero de identificacion",VectorIdentificacion)
     datosPorCliente.insert(2,nombreDatoColumna,VectorTotales)

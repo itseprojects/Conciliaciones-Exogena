@@ -113,7 +113,7 @@ def WorkSiesa(container_name,balanceFile,blob_name_DB,idEjecucion,idProcedencia)
         TercerosPorConcepto['Ingresos Brutos Recibidos'] = TercerosPorConcepto['Ingresos Brutos Recibidos'].apply(np.ceil)
         TercerosPorConcepto.rename(columns = {'Ingresos Brutos Recibidos':'Saldo a CXC a 31 de diciembre'}, inplace = True)
         
-        saveToBD(TercerosPorConcepto["Saldo a CXC a 31 de diciembre"].sum(),idEjecucion,idProcedencia)#,rentaPath)    
+        saveToBD(TercerosPorConcepto["Saldo a CXC a 31 de diciembre"].sum(),idEjecucion,idProcedencia,DatosSeparados[(DatosSeparados['NumeroCuenta']==13)].sum()[ColumnaValorIngreso])#,rentaPath)    
         # Ajustar parte estética y almacenar en el BLob Storage
         PutColorsAnsSaveToBlob(TercerosPorConcepto,container_name)
         
@@ -127,7 +127,7 @@ def WorkSiesa(container_name,balanceFile,blob_name_DB,idEjecucion,idProcedencia)
     return json.dumps(dicToReturn)
 
 
-def saveToBD(valorHaxa,idEjecucion,idProcedencia):#,rentaPath):
+def saveToBD(valorHaxa,idEjecucion,idProcedencia,valorContable):#,rentaPath):
     """
     Almacena las comprobaciones en BD.
     Args:
@@ -156,10 +156,10 @@ def saveToBD(valorHaxa,idEjecucion,idProcedencia):#,rentaPath):
     cursor = cnxn.cursor()
         
     insert_stmt = (
-                    "INSERT INTO Diferencias (id_ejecuccion, id_procedencia, nombre_diferencia, numeroc,observaciones,valor_HAXA) \
-                    VALUES (?,?,?,?,?,?)"
+                    "INSERT INTO Diferencias (id_ejecuccion, id_procedencia, nombre_diferencia,comprobacion, numeroc,observaciones,valor_HAXA) \
+                    VALUES (?,?,?,?,?,?,?)"
                     )
-    data = (idEjecucion,idProcedencia,"Total Contable","13","",valorHaxa)
+    data = (idEjecucion,idProcedencia,"Total Contable",valorContable,"13","",valorHaxa)
     # insertar registro en bd
     cursor.execute(insert_stmt, data)
     cnxn.commit()
