@@ -5,6 +5,8 @@ Created on Fri Oct 28 17:19:31 2022
 @author: HaroldFerneyGomez
 """
 from cmath import nan
+from concurrent.futures import ThreadPoolExecutor
+from itertools import repeat
 import logging
 from operator import index
 import azure.functions as func
@@ -21,6 +23,9 @@ from openpyxl.utils.dataframe import dataframe_to_rows
 import numpy as np
 import unicodedata
 import json
+import pyodbc
+import requests
+# import grequests
 
 # Datos del blob storage
 account_name = 'itseblobdev' #'probepython'
@@ -36,20 +41,20 @@ blob_name_to_save = 'Formato1001-'+ str(date.today())+'.xlsx' # Archivo excel a 
 # Definicion de los conceptos para el formato tipo SIESA
 conceptos = {"5055":[515500,525500,725500], 
             "5056":[519520],
-            "5002":[511000,521000,721000],
+            "5002":[511000,521000,721000], # solo si la persona natural está en 2485: -20 hon no declarantes, o -21 declarantes, se reporta, sino en el f2276
             "5003":[530516],
             "5004":[513000,513500,514000,514500,515000,523500,523600,524000,524500,530505,722500,723000,723500,724000,724500],
             "5005":[512000,722000,169920],
             "5006":[530520,530521,530522,530523], # formato: se reportó en el 5063 excepto el 530523 intereses intercompany
             "5063":[531521], 
             "5007":[141000,143500,144000],
-            "5008":[158800,150800,152400,152500,152800,154000],
-            "5010":[510565,510568,510571,520572,520575,520578],
-            "5011":[510574,510577,520568,520569],
-            "5012":[510580,520570],
+            "5008":[150800,152400,152500,152800,154000,158800],
+            # "5010":[510565,510568,510571,520572,520575,520578],
+            # "5011":[510574,510577,520568,520569],
+            # "5012":[510580,520570],
             "5013":[],
             "5014":[], 
-            "5015":[511505,511508,521505,521535,521508,530550,721500],
+            "5015":[511505,511508,521505,521508,521535,530550,721500],
             "5066":[],
             "5058":[512500,522500],
             "5060":[],
@@ -90,11 +95,11 @@ conceptos = {"5055":[515500,525500,725500],
             "5075":[],
             "5076":[],
             "5079":[],
-             }
+            }
 
 # Columnas adicionales
-ivaColumnaO = [511535,521570,511537,521571]
 pagoNoDeducible = {"5016":[529521,530555,532005,539520,539581,539582]}
+ivaColumnaO = [511535,511537,521570,521571]
 # No se presenta retenciones para el id:800197268 => aduanas 
 # va en cualquier concepto (el primero por default) que esté el tercero
 reteFuentePracRenta = {"5002":[248520,248521],
@@ -113,20 +118,69 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     TipoBalance = req.get_json().get('TipoBalance') #"SIESA"
     blob_name_DB = req.get_json().get('BaseDeDatos') #'BASE DE DATOS EXELTIS.xls'
     balanceFile = req.get_json().get('Balance')
+    idEjecucion = req.get_json().get('IdEjecucion')
+    idProcedencia = req.get_json().get('IdProcedencia')
+    planillas = req.get_json().get('Planillas')
     
+    dfPlanillas = analizarPlanillas(planillas,Cliente)
     if TipoBalance=="SIESA":
         # Datos para la base de datos
-        blob_name_DB = 'BASE DE DATOS EXELTIS.xls'
+        # blob_name_DB = 'BASE DE DATOS EXELTIS.xls'
         HeaderHojaDB = 0
         nombreHojaDB="Sheet1"
-        exito = WorkSiesa(Cliente,balanceFile,blob_name_DB)
+        exito = WorkSiesa(Cliente,balanceFile,blob_name_DB,idEjecucion,idProcedencia,dfPlanillas)
     else: 
         dicToReturn = {"error":"Tipo de balance no implementado"}
         exito = json.dumps(dicToReturn) 
 
     return func.HttpResponse(f"{exito}", status_code=200 )
 
-def WorkSiesa(container_name,balanceFile,blob_name_DB):  
+def getData(urlPDF,cliente):
+    url = "https://readpdfs.azurewebsites.net/api/readpdf"
+    data = {
+        "tipoPDF":"planilla",
+        "id":3,
+        "urlPDF":urlPDF,
+        "passwordPDF":"",
+        "cliente": cliente
+    }
+    r  = requests.post(url,json=data)
+    return str(r.json()['ruta']).rsplit('/',1)[1]
+
+def analizarPlanillas(planillas,Cliente):
+    # Ingreso al blob storage
+    blob_service_client = BlobServiceClient(account_url = f'https://{account_name }.blob.core.windows.net/', credential = account_key)
+    DatosPlanillas = pd.DataFrame()
+    with ThreadPoolExecutor() as executor:
+        for planilla, ruta in zip(planillas, executor.map(getData,planillas,repeat(Cliente))):
+            print(f'{planilla} resultado: {ruta}')
+            blob_client = blob_service_client.get_blob_client(container = Cliente, blob = ruta.replace('%20',' '))
+            downloader = blob_client.download_blob()
+            Datos = pd.read_excel(downloader.readall(), sheet_name="Datos", header=0,engine='openpyxl')
+            Datos =  Datos[~Datos['AFILIADOS'].isnull()]
+            Datos =  Datos[~(Datos['RIESGO']=="TOTAL")]
+            Datos = Datos.drop(['CODIGO','DV','AFILIADOS','INTERESES MORA','SALDOS E','VALOR A PAGAR'], axis=1)
+            Datos['VALOR LIQUIDADO'] = Datos['VALOR LIQUIDADO'].apply(lambda x: int(x.replace(',','')))
+            riesgos = Datos['RIESGO']
+            conceptos = []
+            concepto = ""
+            for riesgo in riesgos:
+                try:
+                    if riesgo.__contains__('(ADMINISTRADORAS:'):
+                        
+                        concepto = "5012" if riesgo.__contains__('AFP') else "5011" if bool([x for x in ['ARL','EPS'] if(x in riesgo)]) else "5010"
+                except:pass
+                conceptos.append(concepto)
+            Datos['Concepto'] = conceptos
+            DatosPlanillas = pd.concat([DatosPlanillas, Datos], ignore_index=True ).groupby(['NIT','RIESGO','Concepto']).sum(numeric_only=True).reset_index()
+    DatosPlanillas['VALOR LIQUIDADO'] = np.where(DatosPlanillas['Concepto']=="5012",75*DatosPlanillas['VALOR LIQUIDADO']/100,np.where(DatosPlanillas['Concepto']=="5011",75*DatosPlanillas['VALOR LIQUIDADO']/100,DatosPlanillas['VALOR LIQUIDADO']))
+    DatosPlanillas['Pago o abono en cuenta no deducible'] = np.where(DatosPlanillas['Concepto']=="5012",25*DatosPlanillas['VALOR LIQUIDADO']/100,np.where(DatosPlanillas['Concepto']=="5011",25*DatosPlanillas['VALOR LIQUIDADO']/100,0))
+    DatosPlanillas['NIT'] = DatosPlanillas['NIT'].apply(lambda x: int(x.replace(',','')))
+    DatosPlanillas.rename(columns = {'RIESGO':'Razón social','VALOR LIQUIDADO':'Ingresos Brutos Recibidos','NIT':'Numero de identificacion'}, inplace = True)
+    DatosPlanillas.insert(5,'NumeroCuenta',510500)
+    return DatosPlanillas                                 
+
+def WorkSiesa(container_name,balanceFile,blob_name_DB,idEjecucion,idProcedencia,dfPlanillas):  
     HeaderHojaBalance=11
     nombreHojaBalance= "Hoja 1" 
     try:
@@ -153,8 +207,11 @@ def WorkSiesa(container_name,balanceFile,blob_name_DB):
         DatosSeparados = separarCuentas(Datos)
         ColumnaValorIngreso += 3    # separaCuentas añade 3 columnas
         
+        # Elaborar formato parte contable
         TercerosPorConcepto = GetClientsByConcept(DatosSeparados,ColumnaValorIngreso)
         TercerosPorConcepto = GetClientsByPagoNoDeducible(DatosSeparados,ColumnaValorIngreso,TercerosPorConcepto,'pagoNoDeducible')       
+        # insertar planillas
+        TercerosPorConcepto = pd.concat([TercerosPorConcepto,dfPlanillas], ignore_index=True ).reset_index()
         TercerosPorConcepto = GetIvaByClient(DatosSeparados, ColumnaValorIngreso,TercerosPorConcepto,'iva')
         TercerosPorConcepto.insert(6,'Iva mayor valor del costo o gasto no deducible', 0) # Siempre en 0
         TercerosPorConcepto = GetClientsByPagoNoDeducible(DatosSeparados,ColumnaValorIngreso,TercerosPorConcepto,'reteFuente') 
@@ -162,15 +219,25 @@ def WorkSiesa(container_name,balanceFile,blob_name_DB):
         TercerosPorConcepto = GetIvaByClient(DatosSeparados, ColumnaValorIngreso,TercerosPorConcepto,'reteIvaRegComun')
         TercerosPorConcepto = GetIvaByClient(DatosSeparados, ColumnaValorIngreso,TercerosPorConcepto,'reteIvaRegNoDomiciliada')
         
-        # leer base de datos de usuarios y municipios de Colombia
+        # Realizar comprobaciones de la parte contable
+        dfDiferencias = makeComprobations(TercerosPorConcepto,container_name,DatosSeparados,ColumnaValorIngreso)
+        # Almacenar comprobaciones en la BD
+        saveToBD(dfDiferencias,idEjecucion,idProcedencia)
+        # Unir terceros por cada concepto
+        TercerosPorConcepto = TercerosPorConcepto.groupby(['Concepto','Numero de identificacion','Razón social']).sum(numeric_only=True).reset_index()
+        TercerosPorConcepto =TercerosPorConcepto .drop('index',axis=1)       
+        # Leer base de datos de usuarios y municipios de Colombia
         blob_client = blob_service_client.get_blob_client(container = container_name, blob = blob_name_DB)
         downloader = blob_client.download_blob()
         dbUsers = pd.read_excel(downloader.readall(), sheet_name="Sheet1", header=0)#,engine='openpyxl')
-        blob_client = blob_service_client.get_blob_client(container = container_name, blob = MupiosenBlob)
+        blob_client = blob_service_client.get_blob_client(container = "data", blob = MupiosenBlob)
         downloader = blob_client.download_blob()
         dbMupios = pd.read_excel(downloader.readall(), sheet_name="municipios", header=0,converters={'Código Municipio':str,'Código Departamento':str},engine='openpyxl')
 
+        # Agregar datos de los terceros al formato
         TercerosPorConcepto = BuscarId(TercerosPorConcepto,dbUsers,dbMupios)
+        
+        # Limpieza y adecuación de datos y columnas
         TercerosPorConcepto["Pais"]= np.where(TercerosPorConcepto["Código depto"]=="","",TercerosPorConcepto["Pais"])
         TercerosPorConcepto["Razón social"]= np.where(TercerosPorConcepto["Primer apellido"]!="","",TercerosPorConcepto["Razón social"])
         TercerosPorConcepto = TercerosPorConcepto.drop(TercerosPorConcepto[(TercerosPorConcepto['Ingresos Brutos Recibidos']==0) & 
@@ -191,64 +258,65 @@ def WorkSiesa(container_name,balanceFile,blob_name_DB):
         TercerosPorConcepto['Retención en la fuente asumida en renta'] = TercerosPorConcepto['Retención en la fuente asumida en renta'].apply(np.ceil)
         TercerosPorConcepto['Retención en la fuente practicada IVA régimen común'] = TercerosPorConcepto['Retención en la fuente practicada IVA régimen común'].apply(np.ceil)
         TercerosPorConcepto['Retención en la fuente practicada IVA no domiciliados'] = TercerosPorConcepto['Retención en la fuente practicada IVA no domiciliados'].apply(np.ceil)
+        TercerosPorConcepto = TercerosPorConcepto.drop(['NumeroCuenta'], axis=1) # Eliminar columna no necesaria
         
-        # PutColorsAnsSaveToBlob(TercerosPorConcepto,container_name)
-        jsonComprobation = makeComprobations(TercerosPorConcepto,container_name,DatosSeparados,ColumnaValorIngreso)
-        
+        # Ajustar parte estética y almacenar en el BLob Storage
+        PutColorsAnsSaveToBlob(TercerosPorConcepto,container_name)
+            
+
+        dicToReturn = {
+            "error":"ninguno",
+            "ruta":f'https://{account_name}.blob.core.windows.net/{container_name}/{blob_name_to_save}'
+            }
+
     except Exception as e:
         dicToReturn = {"error":f"{e}"}
-        return json.dumps(dicToReturn)
-    return jsonComprobation
+    return json.dumps(dicToReturn)
+
+def saveToBD(comprobations,idEjecucion,idProcedencia):
+    server = 'rbhaxa.database.windows.net' 
+    database = 'haxa' 
+    username = 'rbitse' 
+    password = 'QbLnBh29XUrDpzX'
+    driver= '{ODBC Driver 17 for SQL Server}'# {SQL Server}
+    cnxn = pyodbc.connect(f'DRIVER={driver};SERVER={server}'+';DATABASE='+database+';ENCRYPT=yes;UID='+username+';PWD='+ password)
+    cursor = cnxn.cursor()
+    for table_name in cursor.tables(tableType='TABLE'):
+        print(table_name)
+        
+    for i in range(len(comprobations)): 
+        nameDiff = comprobations.iloc[i,1].strip()#[0:35]
+        insert_stmt = (
+                        "INSERT INTO Diferencias (id_ejecuccion, id_procedencia, nombre_diferencia ,comprobacion, numeroc,observaciones,valor_HAXA) \
+                        VALUES (?,?,?,?,?,?,?)"
+                        )
+        data = (idEjecucion,idProcedencia,comprobations.iloc[i,1].strip(),comprobations.iloc[i,2],str(comprobations.iloc[i,0]),comprobations.iloc[i,4],comprobations.iloc[i,3])
+        # insertar registro en bd
+        cursor.execute(insert_stmt, data)
+        cnxn.commit()
+    return None
 
 def makeComprobations(TercerosPorConcepto,container_name,DatosSeparados,ColumnaValorIngreso):
     tablaParaComprobar = ExtraerCtas(DatosSeparados)
+    tablaParaComprobar.columns.values[2] = "ValorContable"
     tablaParaComprobar['Formato'] = 0
-    # 14 activos movibles
-    HonB = DatosSeparados[(DatosSeparados['NIT']=="")&(DatosSeparados['NumeroCuenta']==14)].iloc[:,ColumnaValorIngreso].sum()
-    HonF = TercerosPorConcepto[(TercerosPorConcepto['Concepto']=='5007')].loc[:,'Pago o abono en cuenta deducible'].sum()
-    tablaParaComprobar["Formato"]= np.where(tablaParaComprobar["NumeroCuenta"]==14,HonF,tablaParaComprobar["Formato"])
-    # buscar prop planta 15
-    HonB = DatosSeparados[(DatosSeparados['NIT']=="")&(DatosSeparados['NumeroCuenta']==15)].iloc[:,ColumnaValorIngreso].sum()
-    HonF = TercerosPorConcepto[(TercerosPorConcepto['Concepto']=='5008')].loc[:,'Pago o abono en cuenta deducible'].sum()
-    tablaParaComprobar["Formato"]= np.where(tablaParaComprobar["NumeroCuenta"]==15,HonF,tablaParaComprobar["Formato"])
-    # buscar gastos 5
+    tablaParaComprobar['Observaciones'] = ""
     
-    # buscar gastos op 51
-    # Beneficios a empleados
-    # Honorarios
-    HonB = DatosSeparados[(DatosSeparados['NIT']=="")&(DatosSeparados['NumeroCuenta']==5110)].iloc[:,ColumnaValorIngreso].sum()
-    HonF = TercerosPorConcepto[(TercerosPorConcepto['Concepto']=='5002')].loc[:,'Pago o abono en cuenta deducible'].sum()
-    tablaParaComprobar["Formato"]= np.where(tablaParaComprobar["NumeroCuenta"]==5110,HonF,tablaParaComprobar["Formato"])
-    # Impuestos
-    # Arrendamientos 
-    ArrB = ceil(DatosSeparados[(DatosSeparados['NIT']=="")&(DatosSeparados['NumeroCuenta']==5120)].iloc[:,ColumnaValorIngreso].sum())
-    ArrF = ceil(TercerosPorConcepto[(TercerosPorConcepto['Concepto']=='5005')].loc[:,'Pago o abono en cuenta deducible'].sum())
-    tablaParaComprobar["Formato"]= np.where(tablaParaComprobar["NumeroCuenta"]==5120,ArrF,tablaParaComprobar["Formato"])
-    # Seguros 
-    SegB = DatosSeparados[(DatosSeparados['NIT']=="")&(DatosSeparados['NumeroCuenta']==5130)].iloc[:,ColumnaValorIngreso].sum()
-    SegF = TercerosPorConcepto[(TercerosPorConcepto['Concepto']=='5005')].loc[:,'Pago o abono en cuenta deducible']#.sum()
-    # Servicios 
-    # Gastos legales 
-    # Mantenimiento Adecuaciones 
-    # Gastos de viaje 
-    # Depreciaciones 
-    # Diversos
-    print(f'Honorarios:\nBalance: {HonB}\nFormato: {HonF}\n'+
-          f'Arrendamientos:\nBalance: {ArrB}\nFormato: {ArrF}\n'+
-          f'Seguro:\nBalance: {SegB}\nFormato: {SegF}\n')
-    print(tablaParaComprobar[(tablaParaComprobar['Formato']>0)])
-    
-    # buscar gastos no operacionales 53
-    # data = UnificarClientesPorCuenta(DatosSeparados,5305,5306,"Ingresos Brutos Recibidos",ColumnaValorIngreso)
-    # buscar impuestos 54
-    # buscar costos de pro 7
-    dicToReturn = {
-        "error":"ninguno",
-        "ruta":f'https://{account_name}.blob.core.windows.net/{container_name}/{blob_name_to_save}',
-        "ArrendamientoB":ArrB,
-        "ArrendamientoF":ArrF
-        }
-    return json.dumps(dicToReturn)
+    for concepto in conceptos:
+        for clave in conceptos[concepto]:
+            clave4Digitos = int(str(clave)[0:4])
+            valorEnFormato = TercerosPorConcepto[(TercerosPorConcepto['Concepto']==concepto) & (TercerosPorConcepto['NumeroCuenta']==clave)].loc[:,'Ingresos Brutos Recibidos'].sum()
+            tablaParaComprobar["Formato"]+= np.where(tablaParaComprobar["NumeroCuenta"]==clave4Digitos,valorEnFormato,0)#tablaParaComprobar["Formato"])
+            try:
+                ind = tablaParaComprobar[(tablaParaComprobar["NumeroCuenta"]==clave4Digitos)].index
+                pasaAjustePeso = True if abs(tablaParaComprobar.loc[ind,'ValorContable'].iloc[0]-tablaParaComprobar.loc[ind,'Formato'].iloc[0])<1000 else False
+                tablaParaComprobar.loc[ind,'Observaciones']='' if pasaAjustePeso else "Valor reportado es diferente al valor contable"
+                if clave4Digitos == 5195:
+                    print(tablaParaComprobar.loc[ind,'ValorContable'].iloc[0],' : contable - formato: ',valorEnFormato)
+            except Exception as e:
+                pass
+    #tablaParaComprobar["Observaciones"]= np.where(tablaParaComprobar["ValorContable"]==tablaParaComprobar["Formato"],tablaParaComprobar["Observaciones"],"No Coincide")
+    return tablaParaComprobar
 
 # Función que agrega color según el tipo de contenido de las columnas y guarda archivo excel en el Blob Storage,
 #   Asigna el color rojo para advertir sobre datos relacionados de la base de datos de usuarios y amarillo para datos relacionados con el balance
@@ -330,7 +398,7 @@ def GetIvaByClient(DatosSeparados, ColumnaValorIngreso,TercerosPorConcepto, cual
         data = UnificarClientesPorCuenta(DatosSeparados,ivaCount,ivaCount+1,"Ingresos Brutos Recibidos",ColumnaValorIngreso)
         # print(data.columns)
         if ~(data.empty) and cualColumna!='iva':
-            data = data.drop(data[(data['Numero de identificacion']=='800197268')].index) # eliminar registro para este #id
+            data = data.drop(data[(data['Numero de identificacion']=='800197268')].index) # eliminar registro para este #id DIRECCION DE IMPUESTOS Y ADUANAS NACIONALES
         TercerosPorIva = pd.concat([TercerosPorIva, data], ignore_index=True ).groupby(['Numero de identificacion','Razón social']).sum(numeric_only=True).reset_index()
             
     # Buscar en TercerosPorConcepto si existen los clientes en cualquier concepto y se fusionan los datos
@@ -369,6 +437,7 @@ def GetClientsByConcept(DatosSeparados, ColumnaValorIngreso):
         soloConcepto['Numero de identificacion']= None
         soloConcepto['Razón social'] = None
         soloConcepto['Ingresos Brutos Recibidos'] = None
+        #soloConcepto['NumeroCuenta'] = 0
         # print(soloConcepto.columns)
         for conc in conceptos[clave]:
             # print(">> "+str(conc))
@@ -392,10 +461,20 @@ def GetClientsByConcept(DatosSeparados, ColumnaValorIngreso):
                         data=data1
                     else: data=pd.DataFrame()
             else: data = UnificarClientesPorCuenta(DatosSeparados,conc,(conc+ (100 if str(conc).endswith("00") else 1)),"Ingresos Brutos Recibidos",ColumnaValorIngreso)
+
+            data.insert(0,'NumeroCuenta', conc)
+            # soloConcepto00 = soloConcepto00.combine_first(data)
+            
+            
+            # uncomment **********
             # Agrupa los terceros por su #id y razon social y suma sus totales
-            soloConcepto = pd.concat([soloConcepto, data], ignore_index=True ).groupby(['Numero de identificacion','Razón social']).sum(numeric_only=True).reset_index()
-                
+            soloConcepto = pd.concat([soloConcepto, data], ignore_index=True )#.groupby(['Numero de identificacion','Razón social']).sum(numeric_only=True).reset_index()
             # Agrega todos los terceros únicos en el concepto al df de salida
+        # solo si la persona natural está en 2485: -20 hon no declarantes, o -21 declarantes, se reporta, sino en el f2276
+        if clave=='5002':
+            data0 = UnificarClientesPorCuenta(DatosSeparados,248520,248522,"Ingresos Brutos Recibidos",ColumnaValorIngreso)
+            mascara = soloConcepto["Numero de identificacion"].isin(data0["Numero de identificacion"])
+            soloConcepto = soloConcepto[mascara]
         if ~soloConcepto.empty: 
             soloConcepto.insert(0,'Concepto', clave)
             TercerosPorConcepto = pd.concat([TercerosPorConcepto, soloConcepto],ignore_index=True)
@@ -421,16 +500,16 @@ def GetClientsByPagoNoDeducible(DatosSeparados, ColumnaValorIngreso,Terceros, mo
     
     # print(TercerosPorConcepto.columns)
     for clave in pagoNoDeducible if modo=="pagoNoDeducible" else reteFuentePracRenta:
-        # print("**************************************************  "+clave)
         soloConcepto = pd.DataFrame()
         soloConcepto['Numero de identificacion']= None
         soloConcepto['Razón social'] = None
         soloConcepto['Ingresos Brutos Recibidos'] = None
         for conc in pagoNoDeducible[clave] if modo=="pagoNoDeducible" else reteFuentePracRenta[clave]:
             data = UnificarClientesPorCuenta(DatosSeparados,conc,(conc+ 1),"Ingresos Brutos Recibidos",ColumnaValorIngreso)
+            data.insert(0,'NumeroCuenta', conc) # ********************
             if  modo!="pagoNoDeducible": # modo obtener retencion
                 data = data.drop(data[(data['Numero de identificacion']=='800197268')].index) # eliminar registro para este #id
-            soloConcepto = pd.concat([soloConcepto, data], ignore_index=True ).groupby(['Numero de identificacion','Razón social']).sum(numeric_only=True).reset_index()    
+            soloConcepto = pd.concat([soloConcepto, data], ignore_index=True ) # uncomment.groupby(['Numero de identificacion','Razón social']).sum(numeric_only=True).reset_index()    
         if ~soloConcepto.empty: 
             for ind in soloConcepto.index :
                 try:    # buscar si ya existe en Terceros ese cliente para ese concepto, de lo contrario lo agrega con ingresos = 0
@@ -439,6 +518,7 @@ def GetClientsByPagoNoDeducible(DatosSeparados, ColumnaValorIngreso,Terceros, mo
                         firstElement = soloConcepto.loc[ind:ind]
                         firstElement['Ingresos Brutos Recibidos']=0
                         firstElement['Concepto']=clave
+                        #firstElement['NumeroCuenta'] = conc
                 except Exception:
                     firstElement = soloConcepto.loc[ind:ind]
                     firstElement['Ingresos Brutos Recibidos']=0
@@ -454,11 +534,13 @@ def GetClientsByPagoNoDeducible(DatosSeparados, ColumnaValorIngreso,Terceros, mo
                 
                 # seleccionar columnas necesarias
                 TercerosParaComparar = TercerosParaComparar[["Numero de identificacion","Razón social","Ingresos Brutos Recibidos",
-                                                         "Pago o abono en cuenta no deducible" if modo=="pagoNoDeducible" else 'Retención en la fuente practicada en renta',"Concepto"]]
+                                                         "Pago o abono en cuenta no deducible" if modo=="pagoNoDeducible" else 'Retención en la fuente practicada en renta',"Concepto",'NumeroCuenta']]
             # TercerosPorIvaParaComparar.append(firstElement,ignore_index=True)
     # Fusionar con el df de salida agregando las columnas segun el modo de operación de la función
     TercerosPorConcepto = pd.merge(Terceros, TercerosParaComparar,  how='outer', on=['Numero de identificacion','Concepto','Ingresos Brutos Recibidos','Razón social']).fillna(value=0)
 
+    TercerosPorConcepto['NumeroCuenta'] = np.where(TercerosPorConcepto['NumeroCuenta_x']>0,TercerosPorConcepto["NumeroCuenta_x"],TercerosPorConcepto['NumeroCuenta_y']) 
+    TercerosPorConcepto = TercerosPorConcepto.drop(['NumeroCuenta_x', 'NumeroCuenta_y'], axis=1)
     return TercerosPorConcepto  
 
 # Función que lee la columna Cuentas, separa nits de razón social y las cuentas

@@ -35,7 +35,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
 
     if TipoBalance=="SIESA":
         # Datos para la base de datos
-        blob_name_DB = 'BASE DE DATOS EXELTIS.xls'
+        # blob_name_DB = 'BASE DE DATOS EXELTIS.xls'
         HeaderHojaDB = 0
         nombreHojaDB="Sheet1"
         exito = WorkSiesa(Cliente,balanceFile,blob_name_DB)

@@ -5,22 +5,13 @@ Created on Wed Oct 19 11:08:32 2022
 """
 from asyncore import read
 from cmath import nan
-from dataclasses import fields
 import logging
-from operator import index
-
 import azure.functions as func
 
 from datetime import datetime, timedelta
-import pandas as pd
-from azure.storage.blob import BlobSasPermissions, generate_blob_sas, BlobServiceClient
 import urllib.parse
-from math import ceil
-from io import BytesIO
-# para funcion de Jumio
 import requests
 from requests.auth import HTTPDigestAuth
-
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
     name = req.get_json().get('name')
@@ -28,32 +19,38 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     endFly = req.get_json().get('endFly')
     gender = req.get_json().get('gender')#"male"
     image_url = req.get_json().get('image_url')
+    disp_url = req.get_json().get('disp_url')#"male"
+    user = req.get_json().get('user')
+    passw = req.get_json().get('passw')
     
-    newEmployee = searchLastEmployee()
-    addPerson(newEmployee,name,dateFly,endFly,gender)
-    agregarFaceData(newEmployee,name,image_url)
+    newEmployee = searchLastEmployee(disp_url,user,passw)
+    addPerson(newEmployee,name,dateFly,endFly,gender,disp_url,user,passw)
+    agregarFaceData(newEmployee,name,image_url,disp_url,user,passw)
     return func.HttpResponse("pasó bien")
 
-def searchLastEmployee():
-    url = 'http://186.29.90.58:8661/ISAPI/AccessControl/UserInfo/Search?format=json'
+def searchLastEmployee(disp_url,user,passw):
+    url = disp_url + '/ISAPI/AccessControl/UserInfo/Search?format=json'
     data = {
     "UserInfoSearchCond":{
         "searchID":"3",
         "searchResultPosition": 0,
         "maxResults": 20
+        }
     }
-    }
-    employees =requests.post(url, auth=HTTPDigestAuth('admin', 'abc12345'),json=data).json()
+    employees =requests.post(url, auth=HTTPDigestAuth(user, passw),json=data).json()
     Listemployees = employees['UserInfoSearch']['UserInfo']
     compara = 0
-    for NEMpleado in Listemployees:
-        if int(NEMpleado['employeeNo'])>compara:
-            compara = int(NEMpleado['employeeNo'])          
-    newEmployee=compara+1
+    if bool(Listemployees):
+        for NEMpleado in Listemployees:
+            if int(NEMpleado['employeeNo'])>compara:
+                compara = int(NEMpleado['employeeNo'])          
+        newEmployee=compara+1
+    else: newEmployee = 1
+    
     return(newEmployee)
 
-def addPerson(newEmployee,name,dateFly,endFly,gender):
-    url = 'http://186.29.90.58:8661/ISAPI/AccessControl/UserInfo/Record?format=json'
+def addPerson(newEmployee,name,dateFly,endFly,gender,disp_url,user,passw):
+    url = disp_url + '/ISAPI/AccessControl/UserInfo/Record?format=json'
     data = {
     "UserInfo": {
         "employeeNo": str(newEmployee),
@@ -84,10 +81,10 @@ def addPerson(newEmployee,name,dateFly,endFly,gender):
         ]
     }
     }
-    print(requests.post(url, auth=HTTPDigestAuth('admin', 'abc12345'),json=data).json())
+    print(requests.post(url, auth=HTTPDigestAuth(user, passw),json=data).json())
 
-def agregarFaceData(newEmployee,name,image_url):
-    url = "http://186.29.90.58:8661/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json"
+def agregarFaceData(newEmployee,name,image_url,disp_url,user,passw):
+    url = disp_url + "/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json"
     data = {
         "faceURL":image_url,
         "faceLibType": "blackFD",
@@ -96,4 +93,4 @@ def agregarFaceData(newEmployee,name,image_url):
         "name": name,
         "bornTime": "2004-05-03"
     }
-    print(requests.post(url, auth=HTTPDigestAuth('admin', 'abc12345'),json=data).json())
+    print(requests.post(url, auth=HTTPDigestAuth(user, passw),json=data).json())
