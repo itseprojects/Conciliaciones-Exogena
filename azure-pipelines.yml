@@ -2,12 +2,12 @@
 trigger: none
 #- pruebaPipelines
 # new coment
-schedules:
-  - cron: '25 19 * * Mon-Fri'
-    displayName: M-F 10:40 daily build
-    branches:
-      include:
-      - pruebaPipelines
+#schedules:
+#  - cron: '25 19 * * Mon-Fri'
+#    displayName: M-F 10:40 daily build
+#    branches:
+#      include:
+#      - pruebaPipelines
       
 pool:
   name: 'TestePool'
