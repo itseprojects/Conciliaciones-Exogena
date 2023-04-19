@@ -48,6 +48,18 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     return func.HttpResponse(f"{exito}", status_code=200 )
 
 def WorkSiesa(container_name,balanceFile,blob_name_DB,idEjecucion,idProcedencia):
+    """
+    Elabora y guarda el formato 1009 en el Blob Storage, almacena las comprobaciones en BD.
+    Args:
+        container_name (str): Nombre del contenedor - cliente.
+        balanceFile (str): Nombre del blob para el balance.
+        blob_name_DB (str): Nombre del blob para la BD de Terceros.
+        idEjecucion (int): Número del registro de la ejecución.
+        idProcedencia (int): Numero del registro de la procedencia.
+        rentaPath (str): Url del archivo pdf de la renta.
+    Returns:
+        dicToReturn: json con información de la ejecución de la función.
+    """
     HeaderHojaBalance=11
     nombreHojaBalance= "Hoja 1"
     try:
@@ -163,6 +175,17 @@ def saveToBD(valorHaxa,idEjecucion,idProcedencia,valorContable):
 #       account_name, account_key, blob_name_to_save
 #   retorna: none
 def PutColorsAnsSaveToBlob(Datos,container_name):
+    '''
+    Guarda el archivo excel coloreado del formato en el Blob Storage.
+    Args:
+        Datos (df): df del formato a guardar.
+        container_name (str): Nombre del contenedor en el Blob Storage.
+        account_name (str): Nombre de la cuenta del Blob.
+        account_key (str): clave de la cuenta del blob.
+        blob_name_to_save (str): Nombre del archivo a guardar.
+    Returns:
+        None.
+    '''
     fillOrange = PatternFill(patternType='solid', fgColor='FCBA03')
     fillRed = PatternFill(patternType='solid', fgColor='EE1111')
 
@@ -203,6 +226,16 @@ def PutColorsAnsSaveToBlob(Datos,container_name):
 
 
 def BuscarId(dfBalance,bd):
+    '''
+    Agrega la información del tercero.
+    Args:
+        dfBalance (df): df de terceros por cada concepto.
+        db (df): df de la base de datos de los usuarios.
+        dbMupios (df): df de la bd de los municipios de Colombia.
+        
+    Returns:
+        dfBalance: dfBalance con información del tercero correspondiente.
+    '''
     TiposDoc={'C':13,'E':31,'N':31,'O':43,'X':31}
     ListadoIds = dfBalance["Numero de identificacion"].tolist()
     vectorCoincidencias = []
@@ -274,6 +307,14 @@ def BuscarId(dfBalance,bd):
     return dfBalance
 
 def separarCuentas(df):
+    '''
+    Separa nits y la razón social del número de cuenta.
+    Args:
+        df (df): df del balance.
+
+    Returns:
+        df: df con 3 columnas extras (Razón social, NIT y NumeroCuenta).
+    '''
     cuentas=df["Cuentas"]
     VectorCuentas = []
     VectorNits = []
@@ -303,6 +344,18 @@ def ObtenerImpuesto(df,ColumnaValorIngreso):
     return -impuestoGenerado
 
 def UnificarClientesPorCuenta(df,limiteInferiorCta,LimiteSuperiorCta,nombreDatoColumna,ColumnaValorImpuesto):
+    '''
+    Obtiene el valor de la columnaValorIngreso del dfBalance para terceros únicos entre un rango definido.
+    Args:
+        df (df): df del balance con el número de cuenta separada de la información del tercero.
+        limiteInferiorCta (int): rango mínimo del valor de cta a buscar, incluido
+        LimiteSuperiorCta (int): rango máximo del valor de la busqueda, no incluido 
+        nombreDatoColumna (str): nombre de la columna a insertar en el df de salida
+        ColumnaValorIngreso (int): Número de la columna Saldo final a (del balance) 
+
+    Returns:
+        datosPorCliente: df con el Numero de identificacion, Razón social y el valor contable del tercero.
+    '''
     datosPorCliente = pd.DataFrame()
     listaSoloClientesImpuesto = df[(df['NIT']!="")&(df['NumeroCuenta']>=limiteInferiorCta)&(df['NumeroCuenta']<=LimiteSuperiorCta)&(df['NIT']!="800197268")]
     listaUnica = listaSoloClientesImpuesto["Razón social"].unique().tolist()
