@@ -311,7 +311,7 @@ def BuscarId(dfBalance,bd):
     vectorNombre = []
     vectorOtrosNombres = []
     # vectorDV = []
-    bd['Id']=bd['Código'].apply(lambda x: x.strip().split("-")[0])
+    bd['Id']=bd['Numero identificación'].apply(lambda x: x.strip().split("-")[0])
     for Id in ListadoIds:
         # if len(bd[(bd['Id']==Id)]['Código'].iloc[0].split("-"))==2:
         #     vectorDV.append(bd[(bd['Id']==Id)]['Código'].iloc[0].strip().split("-")[1])

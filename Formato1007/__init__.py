@@ -157,7 +157,9 @@ def BuscarId(dfBalance,bd):
     vectorSegundoApellido = []
     vectorNombre = []
     vectorOtrosNombres = []
-    bd['Código']=bd['Código'].apply(lambda x: x.strip())
+    bd['Código']=bd['Numero identificación'].apply(lambda x: x.strip().split("-")[0])
+    
+    # bd['Código']=bd['Código'].apply(lambda x: x.strip())
     for Id in ListadoIds:
         try:
             tipoId = bd[(bd['Código']==str(Id))]['Tipo de identificación'].iloc[0]

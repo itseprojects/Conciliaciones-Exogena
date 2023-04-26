@@ -705,7 +705,9 @@ def BuscarId(dfBalance,bd,dbMupios):
     vectorSegundoApellido = []
     vectorNombre = []
     vectorOtrosNombres = []
-    bd['Código']=bd['Código'].apply(lambda x: x.strip())
+    bd['Código']=bd['Numero identificación'].apply(lambda x: x.strip().split("-")[0])
+    
+    # bd['Código']=bd['Código'].apply(lambda x: x.strip())
     for Id in ListadoIds:
         # Buscar si existe el tercero en la db y agrega su información, si no existe agrega NE a columna tipo de documento
         try:
