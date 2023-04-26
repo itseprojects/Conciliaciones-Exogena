@@ -121,8 +121,14 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     idEjecucion = req.get_json().get('IdEjecucion')
     idProcedencia = req.get_json().get('IdProcedencia')
     planillas = req.get_json().get('Planillas')
+    tipoPlanilla = req.get_json().get('TipoPlanilla')
     
-    dfPlanillas = analizarPlanillas(planillas,Cliente)
+    try:
+        dfPlanillas = analizarPlanillas(planillas,Cliente,tipoPlanilla)
+    except Exception as e:
+        dicToReturn = {"error":f"Error en lectura planillas de seguridad social: {e}"}
+        exito = json.dumps(dicToReturn) 
+        return func.HttpResponse(f"{exito}", status_code=200 )
     if TipoBalance=="SIESA":
         # Datos para la base de datos
         # blob_name_DB = 'BASE DE DATOS EXELTIS.xls'
@@ -135,49 +141,84 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
 
     return func.HttpResponse(f"{exito}", status_code=200 )
 
-def getData(urlPDF,cliente):
+def getData(urlPDF,cliente,tipoPlanilla):
     url = "https://readpdfs.azurewebsites.net/api/readpdf"
+    
     data = {
-        "tipoPDF":"planilla",
+        "tipoPDF":tipoPlanilla,
         "id":3,
         "urlPDF":urlPDF,
         "passwordPDF":"",
         "cliente": cliente
     }
     r  = requests.post(url,json=data)
+    print(r)
     return str(r.json()['ruta']).rsplit('/',1)[1]
 
-def analizarPlanillas(planillas,Cliente):
+def analizarPlanillas(planillas,Cliente,tipoPlanilla):
     # Ingreso al blob storage
     blob_service_client = BlobServiceClient(account_url = f'https://{account_name }.blob.core.windows.net/', credential = account_key)
     DatosPlanillas = pd.DataFrame()
+    
     with ThreadPoolExecutor() as executor:
-        for planilla, ruta in zip(planillas, executor.map(getData,planillas,repeat(Cliente))):
+        for planilla, ruta in zip(planillas, executor.map(getData,planillas,repeat(Cliente),repeat(tipoPlanilla))):
             print(f'{planilla} resultado: {ruta}')
             blob_client = blob_service_client.get_blob_client(container = Cliente, blob = ruta.replace('%20',' '))
             downloader = blob_client.download_blob()
-            Datos = pd.read_excel(downloader.readall(), sheet_name="Datos", header=0,engine='openpyxl')
-            Datos =  Datos[~Datos['AFILIADOS'].isnull()]
-            Datos =  Datos[~(Datos['RIESGO']=="TOTAL")]
-            Datos = Datos.drop(['CODIGO','DV','AFILIADOS','INTERESES MORA','SALDOS E','VALOR A PAGAR'], axis=1)
-            Datos['VALOR LIQUIDADO'] = Datos['VALOR LIQUIDADO'].apply(lambda x: int(x.replace(',','')))
-            riesgos = Datos['RIESGO']
-            conceptos = []
-            concepto = ""
-            for riesgo in riesgos:
-                try:
-                    if riesgo.__contains__('(ADMINISTRADORAS:'):
-                        
-                        concepto = "5012" if riesgo.__contains__('AFP') else "5011" if bool([x for x in ['ARL','EPS'] if(x in riesgo)]) else "5010"
-                except:pass
-                conceptos.append(concepto)
-            Datos['Concepto'] = conceptos
+            Datos = pd.DataFrame()
+            if tipoPlanilla=="planillaael":  
+                Datos = pd.read_excel(downloader.readall(), sheet_name="Datos", header=0,engine='openpyxl')
+                if str(Datos.iloc[0][0]).upper().__contains__("RIESGO"):
+                    blob_client = blob_service_client.get_blob_client(container = Cliente, blob = ruta.replace('%20',' '))
+                    downloader = blob_client.download_blob()
+                    Datos = pd.read_excel(downloader.readall(), sheet_name="Datos", header=1,engine='openpyxl')
+                Datos =  Datos[~Datos['AFILIADOS'].isnull()]
+                Datos =  Datos[~(Datos['RIESGO']=="TOTAL")]
+                Datos = Datos.drop(['CODIGO','DV','AFILIADOS','INTERESES MORA','SALDOS E','VALOR A PAGAR'], axis=1)
+                Datos['VALOR LIQUIDADO'] = Datos['VALOR LIQUIDADO'].apply(lambda x: int(x.replace(',','')))
+                riesgos = Datos['RIESGO']
+                conceptos = []
+                concepto = ""
+                for riesgo in riesgos:
+                    try:
+                        if riesgo.__contains__('(ADMINISTRADORAS:'):
+                            
+                            concepto = "5012" if riesgo.__contains__('AFP') else "5011" if bool([x for x in ['ARL','EPS'] if(x in riesgo)]) else "5010"
+                    except:pass
+                    conceptos.append(concepto)
+                Datos['Concepto'] = conceptos
+                DatosPlanillas = pd.concat([DatosPlanillas, Datos], ignore_index=True ).groupby(['NIT','RIESGO','Concepto']).sum(numeric_only=True).reset_index()
+            elif tipoPlanilla=="planillasoi":
+                Datos = pd.read_excel(downloader.readall(), sheet_name="Datos", header=0,engine='openpyxl',  dtype={'Unnamed: 4': str})
+                # Encontrar las filas que están después de "NIT" y agregar una columna nueva para indicar la sección
+                nit_count = 0
+                seccion = {
+                    "1":{"concepto" : "5012", "descripcion" : "pensiones"},
+                    "2":{"concepto" : "5011", "descripcion" : "eps"},
+                    "3":{"concepto" : "5010", "descripcion" : "ccf, demas parafiscales"},
+                    "4":{"concepto" : "5011", "descripcion" : "arl"},
+                    "0":{"concepto" : "ninguno", "descripcion" : "arl"}
+                }
+                Datos["Concepto"] = ""
+                Datos.columns.values[0] = "NIT"
+                Datos.columns.values[2] = "RIESGO"
+                Datos.columns.values[4] = "VALOR LIQUIDADO"
+                for index, row in Datos.iterrows():
+                    if not pd.isnull(row[0]) and "NIT" in str(row[0]):
+                        nit_count += 1
+                    Datos.loc[index, "Concepto"] = seccion[str(nit_count if nit_count<=4 else 3)]['concepto'] # type: ignore
+                Datos = Datos[Datos['VALOR LIQUIDADO'].notna()]
+                #Datos = Datos.rename(columns={"NOMBRE":"RIESGO"})
+                Datos['VALOR LIQUIDADO'] = Datos['VALOR LIQUIDADO'].str.replace('.', '', regex=True).astype(int)            
             DatosPlanillas = pd.concat([DatosPlanillas, Datos], ignore_index=True ).groupby(['NIT','RIESGO','Concepto']).sum(numeric_only=True).reset_index()
+            
+                
     DatosPlanillas['VALOR LIQUIDADO'] = np.where(DatosPlanillas['Concepto']=="5012",75*DatosPlanillas['VALOR LIQUIDADO']/100,np.where(DatosPlanillas['Concepto']=="5011",75*DatosPlanillas['VALOR LIQUIDADO']/100,DatosPlanillas['VALOR LIQUIDADO']))
     DatosPlanillas['Pago o abono en cuenta no deducible'] = np.where(DatosPlanillas['Concepto']=="5012",25*DatosPlanillas['VALOR LIQUIDADO']/100,np.where(DatosPlanillas['Concepto']=="5011",25*DatosPlanillas['VALOR LIQUIDADO']/100,0))
     DatosPlanillas['NIT'] = DatosPlanillas['NIT'].apply(lambda x: int(x.replace(',','')))
     DatosPlanillas.rename(columns = {'RIESGO':'Razón social','VALOR LIQUIDADO':'Ingresos Brutos Recibidos','NIT':'Numero de identificacion'}, inplace = True)
     DatosPlanillas.insert(5,'NumeroCuenta',510500)
+        
     return DatosPlanillas                                 
 
 def WorkSiesa(container_name,balanceFile,blob_name_DB,idEjecucion,idProcedencia,dfPlanillas):  
