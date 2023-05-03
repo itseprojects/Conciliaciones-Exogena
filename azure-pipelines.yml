@@ -22,17 +22,27 @@ stages:
     jobs:
       - job: job1
         steps:
-        - task: InstallSSHKey@0
+        - task: PowerShellOnTargetMachines@3
           inputs:
-            knownHostsEntry: 'SHA256:ohD8VZEXGWo6Ez8GSEJQ9WpafgLFsOfLOtGGQCQo6Og pocdevops@POCDevOpserver'
-            sshPublicKey: '$(myPubKey)'
-            sshKeySecureFile: 'id_rsa'
+            Machines: '20.114.250.35'
+            UserName: 'pocdevops'
+            UserPassword: 'P@ssw0rd358*'
+            InlineScript: |
+              # Write your powershell commands here.
+              
+              cd C:\Users\pocdevops\Documents\Eliminar\AZFunctionsPython
+              git branch
+        #- task: InstallSSHKey@0
+        #  inputs:
+        #    knownHostsEntry: 'SHA256:ohD8VZEXGWo6Ez8GSEJQ9WpafgLFsOfLOtGGQCQo6Og pocdevops@POCDevOpserver'
+        #    sshPublicKey: '$(myPubKey)'
+        #    sshKeySecureFile: 'id_rsa'
         - task: SSH@0
           inputs:
             sshEndpoint: 'AgenteWindowsssh'
             runOptions: 'commands'
             commands: |
-              echo "comandos git: " $(cd C:\Users\pocdevops\Documents\Eliminar\AZFunctionsPython) $(git branch) $(git pull)
+              echo "comandos git: " $(cd C:\Users\pocdevops\Documents\Eliminar\AZFunctionsPython) $( $(git pull)
               # git clone git@ssh.dev.azure.com:v3/itse8/HAXA/AZFunctionsPython
               git branch
               git pull
