@@ -1,6 +1,6 @@
 # Starter pipeline
-trigger: none
-#- pruebaPipelines
+trigger: 
+- pruebaPipelines
 # new coment
 #schedules:
 #  - cron: '25 19 * * Mon-Fri'
