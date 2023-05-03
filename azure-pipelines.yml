@@ -28,7 +28,7 @@ stages:
             runOptions: 'commands'
             commands: |
               cd C:\Users\pocdevops\Documents\Eliminar
-              git clone git@ssh.dev.azure.com:v3/itse8/HAXA/AZFunctionsPython
+              # git clone git@ssh.dev.azure.com:v3/itse8/HAXA/AZFunctionsPython
               git branch
               git pull
             readyTimeout: '20000'
