@@ -22,6 +22,16 @@ stages:
     jobs:
       - job: job1
         steps:
+        - task: SSH@0
+          inputs:
+            sshEndpoint: 'AgenteWindowsssh'
+            runOptions: 'commands'
+            commands: |
+              cd C:\Users\pocdevops\Documents\Eliminar
+              git clone git@ssh.dev.azure.com:v3/itse8/HAXA/AZFunctionsPython
+              git branch
+              git pull
+            readyTimeout: '20000'
         - template: templates/parameters.yml  # Template reference
           parameters:
             renombrarArchivo: 'true'
