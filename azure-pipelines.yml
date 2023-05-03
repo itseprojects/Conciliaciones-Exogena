@@ -27,7 +27,7 @@ stages:
             sshEndpoint: 'AgenteWindowsssh'
             runOptions: 'commands'
             commands: |
-              cd C:\Users\pocdevops\Documents\Eliminar\AZFunctionsPython -and echo (git branch)
+              cd C:\Users\pocdevops\Documents\Eliminar\AZFunctionsPython $(git branch)
               echo "comandos git: " $(cd C:\Users\pocdevops\Documents\Eliminar\AZFunctionsPython) $(git pull)
             interactiveSession: true
             readyTimeout: '20000'
@@ -41,7 +41,7 @@ stages:
             sshEndpoint: 'AgenteWindowsssh'
             runOptions: 'commands'
             commands: |
-              echo "comandos git: " $(cd C:\Users\pocdevops\Documents\Eliminar\AZFunctionsPython) $( $(git pull)
+              echo "comandos git: " $(cd C:\Users\pocdevops\Documents\Eliminar\AZFunctionsPython) $(git pull)
               # git clone git@ssh.dev.azure.com:v3/itse8/HAXA/AZFunctionsPython
               git branch
               git pull
