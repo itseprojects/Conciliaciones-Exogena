@@ -28,7 +28,7 @@ stages:
             runOptions: 'commands'
             commands: |
               cd C:\Users\pocdevops\Documents\Eliminar\AZFunctionsPython -and echo (git branch)
-              echo "comandos git: " $(cd C:\Users\pocdevops\Documents\Eliminar\AZFunctionsPython) $( $(git pull)
+              echo "comandos git: " $(cd C:\Users\pocdevops\Documents\Eliminar\AZFunctionsPython) $(git pull)
             interactiveSession: true
             readyTimeout: '20000'
         #- task: InstallSSHKey@0
