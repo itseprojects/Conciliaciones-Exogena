@@ -24,9 +24,9 @@ stages:
         steps:
         - task: InstallSSHKey@0
           inputs:
-            knownHostsEntry: 'devops Key'
+            knownHostsEntry: 'SHA256:ohD8VZEXGWo6Ez8GSEJQ9WpafgLFsOfLOtGGQCQo6Og pocdevops@POCDevOpserver'
             sshPublicKey: '$(myPubKey)'
-            sshKeySecureFile: '$(myPubKey)'
+            sshKeySecureFile: 'id_rsa'
         - task: SSH@0
           inputs:
             sshEndpoint: 'AgenteWindowsssh'
