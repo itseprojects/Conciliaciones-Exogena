@@ -27,7 +27,7 @@ stages:
             sshEndpoint: 'AgenteWindowsssh'
             runOptions: 'commands'
             commands: |
-              echo "comandos git: " $(cd C:\Users\pocdevops\Documents\Eliminar) $(git branch) $(git pull)
+              echo "comandos git: " $(cd C:\Users\pocdevops\Documents\Eliminar\AZFunctionsPython) $(git branch) $(git pull)
               # git clone git@ssh.dev.azure.com:v3/itse8/HAXA/AZFunctionsPython
               git branch
               git pull
