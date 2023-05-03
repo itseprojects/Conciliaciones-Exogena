@@ -22,6 +22,11 @@ stages:
     jobs:
       - job: job1
         steps:
+        - task: InstallSSHKey@0
+          inputs:
+            knownHostsEntry: 'devops Key'
+            sshPublicKey: '$(myPubKey)'
+            sshKeySecureFile: '$(myPubKey)'
         - task: SSH@0
           inputs:
             sshEndpoint: 'AgenteWindowsssh'
