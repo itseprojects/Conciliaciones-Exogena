@@ -22,16 +22,15 @@ stages:
     jobs:
       - job: job1
         steps:
-        - task: PowerShellOnTargetMachines@3
+        - task: SSH@0
           inputs:
-            Machines: '20.114.250.35'
-            UserName: 'pocdevops'
-            UserPassword: 'P@ssw0rd358*'
-            InlineScript: |
-              # Write your powershell commands here.
-              
-              cd C:\Users\pocdevops\Documents\Eliminar\AZFunctionsPython
-              git branch
+            sshEndpoint: 'AgenteWindowsssh'
+            runOptions: 'commands'
+            commands: |
+              cd C:\Users\pocdevops\Documents\Eliminar\AZFunctionsPython -and echo (git branch)
+              echo "comandos git: " $(cd C:\Users\pocdevops\Documents\Eliminar\AZFunctionsPython) $( $(git pull)
+            interactiveSession: true
+            readyTimeout: '20000'
         #- task: InstallSSHKey@0
         #  inputs:
         #    knownHostsEntry: 'SHA256:ohD8VZEXGWo6Ez8GSEJQ9WpafgLFsOfLOtGGQCQo6Og pocdevops@POCDevOpserver'
