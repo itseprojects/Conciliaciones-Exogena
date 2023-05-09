@@ -16,8 +16,15 @@ from openpyxl.utils.dataframe import dataframe_to_rows
 import numpy as np
 from io import BytesIO
 import pyodbc
-import tabula
+import re
 
+"""
+Formatos para extractos e inversiones
+Bancos de cuentas que inician por 1110 y 1120
+inversiones de cuenta 12 que sean diferentes a 0
+
+Falta inversiones, solicitar un balance que contenga estos datos para crear la funcionalidad
+"""
 # Datos del blob storage
 account_name = 'itseblobdev' #'probepython'
 account_key = 'd9sOh0WeqvVF66NQnyWKZWFL/KDje0LizX8UyFWpWX39lLX2C8fxnqRtYD2lOFvNp6aaayQsAq7T+AStvsHyew==' #Zas0npJX9ryEm4hmW/gatWr8aI91oOCvt+qbQKqWrZJCmhv5qh6S/w6ittYYaDBRjRnoxa0h+A8H+ASttcvrrQ=='
@@ -25,9 +32,7 @@ account_key = 'd9sOh0WeqvVF66NQnyWKZWFL/KDje0LizX8UyFWpWX39lLX2C8fxnqRtYD2lOFvNp
 blob_name_to_save = 'Formato1012-'+ str(date.today())+'.xlsx' # Archivo excel a guardar en el blob correspondiente al formato
 MupiosenBlob = "Municipios_de_Colombia.xlsx"
 
-import re
-import os
-from tabula.io import read_pdf
+import requests
 
 def BuscarDV(nit):
     # """Calcula el dígito de verificación de un número de identificación tributaria (NIT) colombiano.    Args:        nit (str, int): Número de identificación tributaria.    Returns:        dv: Dígito de verificación.    """    
@@ -38,7 +43,7 @@ def BuscarDV(nit):
     else: 
         dv = None    
     return dv
-
+'''
 def get_extract_value(bank, pdf_path, password=None):
     if bank == "BBVA":
         a, b, c, d = 270, 340, 300, 100
@@ -83,7 +88,7 @@ def get_extract_value(bank, pdf_path, password=None):
 
     index = ext[0][ext[0].columns[0]].loc[lambda x: x==row_name].index[0]
     return str(ext[0][ext[0].columns[-1]].loc[index]).replace("$","").replace(",","")
-
+'''
 def main(req: func.HttpRequest) -> func.HttpResponse:
     Cliente = req.get_json().get('Cliente') # cliente1
     TipoBalance = req.get_json().get('TipoBalance') #"SIESA"
@@ -91,6 +96,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     balanceFile = req.get_json().get('Balance')
     idEjecucion = req.get_json().get('IdEjecucion')
     idProcedencia = req.get_json().get('IdProcedencia')
+    extract = req.get_json().get('Extractos')
     # rentaPath = req.get_json().get('RentaUrl')
     # planillas = req.get_json().get('Planillas')
     
@@ -98,15 +104,38 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     if TipoBalance=="SIESA":
         HeaderHojaDB = 0
         nombreHojaDB="Sheet1"
-        exito = WorkSiesa(Cliente,balanceFile,blob_name_DB,idEjecucion,idProcedencia)#,rentaPath)
+        exito = WorkSiesa(Cliente,balanceFile,blob_name_DB,idEjecucion,idProcedencia,extract)#,rentaPath)
     else: 
         dicToReturn = {"error":"Tipo de balance no implementado"}
         exito = json.dumps(dicToReturn) 
 
     return func.HttpResponse(f"{exito}", status_code=200 )
 
+def getData(urlPDF,cliente,tipoPlanilla,password=""):
+    """
+    Función que recibe la URL de un archivo PDF, el nombre del cliente y el tipo de planilla y devuelve el nombre del archivo procesado.
+    
+    Parámetros:
+    - urlPDF (str): URL del archivo PDF a procesar.
+    - cliente (str): Nombre del cliente que se está procesando.
+    - tipoPlanilla (str): Tipo de planilla que se está procesando.
+    
+    Retorna:
+    - (str): Ruta del archivo procesado.
+    """
+    url = "https://readpdfs.azurewebsites.net/api/readpdf"
+    data = {
+        "tipoPDF":tipoPlanilla,
+        "id":3,
+        "urlPDF":urlPDF,
+        "passwordPDF":password,
+        "cliente": cliente
+    }
+    r  = requests.post(url,json=data)
 
-def WorkSiesa(container_name,balanceFile,blob_name_DB,idEjecucion,idProcedencia):#,rentaPath):  
+    return str(r.json()['valor'])
+
+def WorkSiesa(container_name,balanceFile,blob_name_DB,idEjecucion,idProcedencia,extractos=[]):#,rentaPath):  
     '''
     Elabora y guarda el formato 1009 en el Blob Storage, almacena las comprobaciones en BD.
     Args:
@@ -142,124 +171,102 @@ def WorkSiesa(container_name,balanceFile,blob_name_DB,idEjecucion,idProcedencia)
         downloader = blob_client.download_blob()
         Datos = pd.read_excel(downloader.readall(), sheet_name=nombreHojaBalance, header=HeaderHojaBalance,engine='openpyxl')
         Datos = Datos[~Datos['Cuentas'].isnull()]
-        DatosSeparados = separarCuentas(Datos)
-        ColumnaValorIngreso += 3    # separaCuentas añade 3 columnas
-        """
-        # Leer base de datos de usuarios
-        blob_client = blob_service_client.get_blob_client(container = container_name, blob = blob_name_DB)
-        downloader = blob_client.download_blob()
-        dbUsers = pd.read_excel(downloader.readall(), sheet_name="Sheet1", header=0)#,engine='openpyxl')
-        # Elaborar formato parte contable
-        TercerosPorConcepto = GetClientsByConcept(DatosSeparados,ColumnaValorIngreso,dbUsers[['Código','Tipo de tercero']])
-        # Leer municipios de Colombia
-        blob_client = blob_service_client.get_blob_client(container = container_name, blob = blob_name_DB)
-        downloader = blob_client.download_blob()
-        dbUsers = pd.read_excel(downloader.readall(), sheet_name="Sheet1", header=0)#,engine='openpyxl')
-        blob_client = blob_service_client.get_blob_client(container = "data", blob = MupiosenBlob)
-        downloader = blob_client.download_blob()
-        dbMupios = pd.read_excel(downloader.readall(), sheet_name="municipios", header=0,converters={'Código Municipio':str,'Código Departamento':str},engine='openpyxl')
+        Datos = Datos.drop(Datos.columns[-2:], axis=1)
 
-        # Agregar datos de los terceros al formato
-        TercerosPorConcepto = BuscarId(TercerosPorConcepto,dbUsers,dbMupios)
-        
-        dv = TercerosPorConcepto.apply(lambda x: BuscarDV(x["Numero de identificacion"] if x['Tipo de documento']==31 else 0),axis=1)
-        TercerosPorConcepto.insert(3,"DV", dv)
-        # Limpieza y adecuación de datos y columnas
-        TercerosPorConcepto["Pais"]= np.where(TercerosPorConcepto["Código depto"]=="","",TercerosPorConcepto["Pais"])
-        TercerosPorConcepto["Razón social"]= np.where(TercerosPorConcepto["Primer apellido"]!="","",TercerosPorConcepto["Razón social"])
+        Datos1 = Datos[(Datos[Datos.columns[0]].fillna("0").str.contains(r"1110")) & ( (Datos[Datos.columns[1]].fillna("0").str.contains(r"CTA")) | (Datos[Datos.columns[1]].fillna("0").str.contains(r"CUENTA")))].dropna().reset_index()
+        Datos2 = Datos[(Datos[Datos.columns[0]].fillna("0").str.contains(r"1120")) & ( (Datos[Datos.columns[1]].fillna("0").str.contains(r"CTA")) | (Datos[Datos.columns[1]].fillna("0").str.contains(r"CUENTA")))].dropna().reset_index()
+        Datos = pd.concat([Datos1,Datos2],ignore_index=True).reset_index()
+        # Datos = Datos.drop([0,len(Datos.index)-1])
+        Datos = Datos.drop(columns=['index','level_0'])
+        """
         TercerosPorConcepto = TercerosPorConcepto.drop(TercerosPorConcepto[(TercerosPorConcepto['Ingresos Brutos Recibidos']==0)].index)
-        TercerosPorConcepto['Ingresos Brutos Recibidos'] = TercerosPorConcepto['Ingresos Brutos Recibidos'].apply(np.round)
-        TercerosPorConcepto["Ingresos Brutos Recibidos"]= TercerosPorConcepto["Ingresos Brutos Recibidos"]*-(1)
+
         TercerosPorConcepto.rename(columns = {'Ingresos Brutos Recibidos':'Saldo a CXC a 31 de diciembre'}, inplace = True)
         
         saveToBD(TercerosPorConcepto["Saldo a CXC a 31 de diciembre"].sum(),idEjecucion,idProcedencia,DatosSeparados[(DatosSeparados['NumeroCuenta']==2)].sum()[ColumnaValorIngreso]*-1)#,rentaPath)    
-        # Ajustar parte estética y almacenar en el BLob Storage
-        PutColorsAnsSaveToBlob(TercerosPorConcepto,container_name)
-        """
-        df = Datos
-        df = df.drop(df.columns[-2:], axis=1)
-
-        df1110 = df[(df[df.columns[0]].fillna("0").str.contains(r"1110"))].dropna()
-        df1110 = df1110.reset_index()
-        df1110 = df1110.drop([0,len(df1110.index)-1])
-        df1110 = df1110.reset_index()
-        df1110 = df1110.drop(columns=['index','level_0'])
         
+        """
+        Datos = Datos.rename(columns= {Datos.columns[-1]:"Saldo"})
+        Datos["Saldo"] = Datos["Saldo"].astype(float)
+        pattern_order=re.compile(r"\b(CTA|CORRIENTE|AHORROS|[0-9\-]+)")
+        Datos["NombreBanco"] = Datos.iloc[:, 1].apply(lambda x: re.sub(pattern_order, "", x).lower().replace(" ", ""))
+        Datos = Datos.groupby("NombreBanco")["Saldo"].sum().reset_index()
         extt = []
-        for index, row in df1110.iterrows():
+        for index, row in Datos.iterrows():
             extb = {}
             correct_value = 0
             bank = ""
-            for extract in req_body.get('extracts'):
-                extract["bank"]
-                if extract["bank"] in row[df1110.columns[1]]:
-                    print(extract["bank"], extract["path"], req_body.get('nit'))
-                    extract_value = get_extract_value(extract["bank"], extract["path"], password=req_body.get('nit'))
-                    extract_value
-                    row[df1110.columns[-1]]
-                    if float(extract_value) != float(row[df1110.columns[-1]]):
+            for extract in extractos:
+                if extract["bank"].lower().__contains__('itau'):
+                    pass
+                elif extract["bank"].lower() in str(row["NombreBanco"]):
+                    extract_value = 0.0
+                    for dato in extract["datos"]:
+                        extract_value += float(getData(dato["path"], container_name, "extracto"+str(extract["bank"]).lower().strip(),dato["password"]))
+                    if float(extract_value) != float(row['Saldo']):
                         correct_value = float(extract_value)
                     bank = extract["bankname"]
 
             if bank:
                 extb["Razón social informado"] = bank
             else:
-                pattern_order = r'[0-9]'
-                extb["Razón social informado"] = re.sub(
-                    pattern_order, '', 
-                    str(row[df1110.columns[1]]).upper().replace('CORRIENTE','').replace('AHORROS','').replace('CTA','').replace('-','')
-                ).strip()
+                #pattern_order = r'[0-9]'
+                extb["Razón social informado"] = row['NombreBanco']
 
             if correct_value == 0:
-                extb["Vr a 31 de diciembre"] = float(row[df1110.columns[-1]])
+                extb["Vr a 31 de diciembre"] = float(row['Saldo'])
             else:
                 extb["Vr a 31 de diciembre"] = correct_value
                 correct_value, bank = 0, ""
             
+            extb["NombreBanco"] = row["NombreBanco"]
             extb["Concepto"] = "1110"
-            extb["Tipo documento"] = None
-            extb["Número identificación del informado"] = None
-            extb["DV"] = None
-            extb["Primer apellido del informado"] = None
-            extb["Segundo apellido del informado"] = None
-            extb["Primer nombre del informado"] = None
-            extb["Otros nombres del informado"] = None
-            extb["País residencia"] = None
             
             extt.append(extb)
 
             df = pd.DataFrame(extt)
             agg_ = {
-                'Vr a 31 de diciembre':'sum', 
+                'NombreBanco':'first',
                 'Concepto':'first',
-                'Tipo documento':'first',
-                'Número identificación del informado':'first',
-                'DV':'first',
-                'Primer apellido del informado':'first',
-                'Segundo apellido del informado':'first',
-                'Primer nombre del informado':'first',
-                'Otros nombres del informado':'first',
-                'País residencia':'first'
+                'Vr a 31 de diciembre':'sum'
             }
             df = df.groupby('Razón social informado', as_index=False, sort=False).agg(agg_)
-            df.to_excel("sample_.xlsx", index=None)
+            # df.to_excel("sample_.xlsx", index=None)
         
         df = pd.DataFrame(extt)
-        agg_ = {
-            'Vr a 31 de diciembre':'sum', 
+        agg_ = { 
+            'NombreBanco':'first',
             'Concepto':'first',
-            'Tipo documento':'first',
-            'Número identificación del informado':'first',
-            'DV':'first',
-            'Primer apellido del informado':'first',
-            'Segundo apellido del informado':'first',
-            'Primer nombre del informado':'first',
-            'Otros nombres del informado':'first',
-            'País residencia':'first'
+            'Vr a 31 de diciembre':'sum'
         }
         df = df.groupby('Razón social informado', as_index=False, sort=False).agg(agg_)
-        df.to_excel(f"{req_body.get('path_final')}sample_.xlsx", index=None)
+        # leer base de datos de usuarios
+        blob_client = blob_service_client.get_blob_client(container = container_name, blob = blob_name_DB)
+        downloader = blob_client.download_blob()
+        dbUsers = pd.read_excel(downloader.readall(), sheet_name="Sheet1", header=0)#,engine='openpyxl')
+        
+        df = BuscarId(df,dbUsers)
 
+        dv = df.apply(lambda x: BuscarDV(x["Número identificación del informado"] if x['Tipo documento']==31 else 0),axis=1)
+        df.insert(3,"DV", dv)
+        df = df.sort_values(by=['Concepto','Número identificación del informado'],ascending=True)
+        df = df.reindex(columns=['Concepto',
+            'Tipo documento',
+            'Número identificación del informado',
+            'DV',
+            'Primer apellido del informado',
+            'Segundo apellido del informado',
+            'Primer nombre del informado',
+            'Otros nombres del informado',
+            'Razón social informado',
+            'País residencia',
+            'Vr a 31 de diciembre'])
+        #df.to_excel(f"{req_body.get('path_final')}sample_.xlsx", index=None)
+        # Ajustar parte estética y almacenar en el BLob Storage
+        df = df.drop(df[(df['Vr a 31 de diciembre']==0) ].index)
+        df['Vr a 31 de diciembre'] = df['Vr a 31 de diciembre'].apply(np.ceil)
+        df['Razón social informado'] = df['Razón social informado'].apply(lambda x: next((bancos['bankname'] for bancos in extractos if bancos['bank'] in x), x))
+        PutColorsAnsSaveToBlob(df,container_name)
         dicToReturn = {
             "error":"ninguno",
             "ruta":f'https://{account_name}.blob.core.windows.net/{container_name}/{blob_name_to_save}'
@@ -269,9 +276,6 @@ def WorkSiesa(container_name,balanceFile,blob_name_DB,idEjecucion,idProcedencia)
         dicToReturn = {"error":f"{e}"}
     return json.dumps(dicToReturn)
 
-
-
-    return func.HttpResponse("Hello")
     
 
 """
@@ -317,24 +321,9 @@ def saveToBD(valorHaxa,idEjecucion,idProcedencia,valorContable):#,rentaPath):
     cursor.execute(insert_stmt, data)
     cnxn.commit()
     return None
+"""
 
-def BuscarDV(nit):
-    '''
-    Calcula el dígito de verificación de un número de identificación tributaria (NIT) colombiano.
-    Args:
-        nit (str, int): Número de identificación tributaria.
-
-    Returns:
-        dv: Dígito de verificación.
-    '''
-    nit = str(nit).strip()
-    if nit.isnumeric() and len(nit) > 2:
-        res = sum(int(digit) * weight for digit, weight in zip(reversed(nit), [3, 7, 13, 17, 19, 23, 29, 37, 41, 43, 47, 53, 59, 67, 71]))
-        dv = 0 if res%11 == 0 else 1 if res%11 == 1 else int(11-res%11)
-    else: dv = None
-    return dv
-
-def BuscarId(dfBalance,bd,dbMupios):
+def BuscarId(dfBalance,bd):
     '''
     Agrega la información del tercero.
     Args:
@@ -346,94 +335,59 @@ def BuscarId(dfBalance,bd,dbMupios):
         dfBalance: dfBalance con información del tercero correspondiente.
     '''
     TiposDoc={'C':13,'E':31,'N':31,'O':43,'X':31}   # bd asigna estas letras según el tipo de doc, se asignan # según normativa del formato
-    ListadoIds = dfBalance["Numero de identificacion"].tolist()
-    vectorDireccion = []
-    vectorCodMpio = []
-    vectorCodDepto = []
-    vectorCoincidencias = []
-    vectorPrimerApellido = []
-    vectorSegundoApellido = []
-    vectorNombre = []
-    vectorOtrosNombres = []
-    bd['Código']=bd['Código'].apply(lambda x: x.strip())
-    for Id in ListadoIds:
+    
+    dfBalance['Razón social informado uni'] = [unicodedata.normalize('NFKD', x).encode('ASCII', 'ignore').decode("UTF-8") for x in dfBalance['NombreBanco']] # Razón social informado']]
+    ListadoIds = dfBalance["Razón social informado uni"].tolist()
+    vectorTipoId = []
+    vectorNumeroId = []
+    vectorRazonSocial = []
+    vectorPais = []
+
+    bd['Razón social unicode'] = [unicodedata.normalize('NFKD', x).encode('ASCII', 'ignore').decode("UTF-8") for x in bd['Razón social']]
+    try:
+        bd['Pais'] = [unicodedata.normalize('NFKD', x).encode('ASCII', 'ignore').decode("UTF-8") for x in bd['Pais']]
+    except:
+        pass
+    for Nombre in ListadoIds:
         # Buscar si existe el tercero en la db y agrega su información, si no existe agrega NE a columna tipo de documento
         try:
-            tipoId = bd[(bd['Código']==str(Id))]['Tipo de identificación'].iloc[0]
-            NumeroTipoID = TiposDoc[tipoId]
-            # si es una Cédula, separa por nombres y apellidos. De lo contrario agrega texto vacio
-            if NumeroTipoID == 13:
-                nombrecompleto = dfBalance[(dfBalance["Numero de identificacion"]==str(Id))]['Razón social'].iloc[0]
-                if len(nombrecompleto.split())==1:
-                    vectorPrimerApellido.append(nombrecompleto)
-                    vectorSegundoApellido.append("")
-                    vectorNombre.append("")
-                    vectorOtrosNombres.append("")
-                elif len(nombrecompleto.split())==2:
-                    vectorPrimerApellido.append(nombrecompleto.split()[0])
-                    vectorSegundoApellido.append(nombrecompleto.split()[1])
-                    vectorNombre.append("")
-                    vectorOtrosNombres.append("")
-                elif len(nombrecompleto.split())==3:
-                    vectorPrimerApellido.append(nombrecompleto.split()[0])
-                    vectorSegundoApellido.append(nombrecompleto.split()[1])
-                    vectorNombre.append(nombrecompleto.split()[2])
-                    vectorOtrosNombres.append("")
-                elif len(nombrecompleto.split())>3:
-                    vectorPrimerApellido.append(nombrecompleto.split()[0]+" "+nombrecompleto.split()[1] if nombrecompleto.split()[0].lower()=="del" 
-                                            else nombrecompleto.split()[0]+" "+nombrecompleto.split()[1]+" "+nombrecompleto.split()[2] if nombrecompleto.split()[0].lower()=="de" and nombrecompleto.split()[1].lower()=="la" 
-                                            else nombrecompleto.split()[0])
-                    vectorSegundoApellido.append(nombrecompleto.split()[2] if nombrecompleto.split()[0].lower()=="del" 
-                                            else nombrecompleto.split()[3] if nombrecompleto.split()[0].lower()=="de" and nombrecompleto.split()[1].lower()=="la" 
-                                            else nombrecompleto.split()[1])
-                    vectorNombre.append(nombrecompleto.split()[3] if nombrecompleto.split()[0].lower()=="del" 
-                                            else nombrecompleto.split()[4] if nombrecompleto.split()[0].lower()=="de" and nombrecompleto.split()[1].lower()=="la" 
-                                            else nombrecompleto.split()[2])
-                    vectorOtrosNombres.append(nombrecompleto.split(maxsplit=4)[4] if nombrecompleto.split()[0].lower()=="del"
-                                            else "" if len(nombrecompleto.split())==5 and nombrecompleto.split()[0].lower()=="de" and nombrecompleto.split()[1].lower()=="la"
-                                            else nombrecompleto.split(maxsplit=5)[5] if nombrecompleto.split()[0].lower()=="de" and nombrecompleto.split()[1].lower()=="la" and len(nombrecompleto.split())>5
-                                            else nombrecompleto.split(maxsplit=3)[3])
-            else:
-                vectorPrimerApellido.append("")
-                vectorSegundoApellido.append("")
-                vectorNombre.append("")
-                vectorOtrosNombres.append("")
-            vectorCoincidencias.append(TiposDoc[tipoId])
-        except Exception:
-            vectorCoincidencias.append("NE")  
-            vectorPrimerApellido.append("")
-            vectorSegundoApellido.append("")
-            vectorNombre.append("")
-            vectorOtrosNombres.append("")
-        
-        # Buscar la ciudad en dbMupios, uso de unicodedata para cambiar acentos
-        try:
-            mpio = bd[(bd["Código"]==str(Id))]['Ciudad'].iloc[0]
-            mpio = unicodedata.normalize('NFKD', mpio).encode('ASCII', 'ignore').decode("UTF-8")
-            dbMupios['Nombre Municipio'] = [unicodedata.normalize('NFKD', x).encode('ASCII', 'ignore').decode("UTF-8") for x in dbMupios['Nombre Municipio']]
-            firstMpio = dbMupios.loc[dbMupios['Nombre Municipio'].str.contains(mpio,case=False)].sort_values('Nombre Municipio')
-            
+            firstMpio = bd.loc[bd['Razón social unicode'].str.contains(Nombre,case=False) & bd['Razón social'].str.contains('banco', case=False)].sort_values('Razón social')
+            if firstMpio.empty:
+                firstMpio = bd.loc[bd['Razón social unicode'].str.contains(Nombre,case=False)].sort_values('Razón social')
             # Si no encuentra la ciudad o el tipo de identificación es X para el tercero, probablemente no sea de Colombia
-            if firstMpio.empty or bd[(bd["Código"]==str(Id))]['Tipo de identificación'].iloc[0]=="X":
-                firstMpio=pd.Series({'Código Departamento':'', 'Código Municipio':"", 'Nombre Departamento':"", 'Nombre Municipio':"", 'Tipo: Municipio / Isla / Área no municipalizada':""}, )
-            # Selecciona el primer municipio de firstMpio
+            if firstMpio.empty:
+                firstMpio=pd.Series({'Tipo de tercero':'',	'Tipo de identificación':'NE',	'Numero identificación':'',
+                                    'Razón social':f'{Nombre}',	'Pais':''})
+        #     # Selecciona el primer municipio de firstMpio
             else: firstMpio = firstMpio.iloc[0,:]
-            vectorDireccion.append(bd[(bd["Código"]==str(Id))]['Dirección 1'].iloc[0]) 
-            vectorCodDepto.append(firstMpio['Código Departamento'])
-            vectorCodMpio.append(firstMpio['Código Municipio'])
+            
+            tipoId = firstMpio['Tipo de identificación']
+            vectorTipoId.append(TiposDoc[tipoId])
+            vectorNumeroId.append(firstMpio['Numero identificación'].strip().split("-")[0])
+            vectorRazonSocial.append(firstMpio['Razón social'])
+            try:
+                if str(firstMpio['Pais']).lower()=="colombia":
+                    vectorPais.append(169)
+                else: vectorPais.append('')
+            except:
+                vectorPais.append("")
+            
+
         except Exception:
-            vectorDireccion.append("") 
-            vectorCodDepto.append("")
-            vectorCodMpio.append("")
-    dfBalance.insert(1,'Tipo de documento', vectorCoincidencias)
-    dfBalance.insert(4,'Pais', 169)
-    dfBalance.insert(3,'Otros nombres', vectorOtrosNombres)
-    dfBalance.insert(3,'Primer nombre', vectorNombre)
-    dfBalance.insert(3,'Segundo apellido', vectorSegundoApellido)
-    dfBalance.insert(3,'Primer apellido', vectorPrimerApellido)
-    dfBalance.insert(8,'Código mpc', vectorCodMpio)
-    dfBalance.insert(8,'Código depto', vectorCodDepto)
-    dfBalance.insert(8,'Dirección', vectorDireccion)
+            vectorTipoId.append("NE")
+            vectorNumeroId.append('')
+            vectorRazonSocial.append(Nombre)
+            vectorPais.append("")
+        
+    dfBalance.insert(1,'Tipo documento', vectorTipoId)
+    dfBalance.insert(1,'Número identificación del informado', vectorNumeroId)
+    dfBalance.insert(1,'Otros nombres del informado', "")
+    dfBalance.insert(1,'Primer nombre del informado', "")
+    dfBalance.insert(1,'Segundo apellido del informado', "")
+    dfBalance.insert(1,'Primer apellido del informado', "")
+    dfBalance['Razón social informado']=vectorRazonSocial
+    dfBalance.insert(1,'País residencia',vectorPais)
+
     return dfBalance
 
 def PutColorsAnsSaveToBlob(Datos,container_name):
@@ -460,7 +414,7 @@ def PutColorsAnsSaveToBlob(Datos,container_name):
     for r in dataframe_to_rows(Datos, index=False, header=True):
         ws.append(r)
     mediumStyle = openpyxl.worksheet.table.TableStyleInfo(name='TableStyleMedium2', showRowStripes=True)
-    table = openpyxl.worksheet.table.Table(ref='A1:N'+str(ws.max_row), displayName='Formato1001ByHG', tableStyleInfo=mediumStyle)
+    table = openpyxl.worksheet.table.Table(ref='A1:K'+str(ws.max_row), displayName='Formato1001ByHG', tableStyleInfo=mediumStyle)
     ws.add_table(table)
     
     # Agrega color a las celdas segun las siguientes normas
@@ -468,17 +422,17 @@ def PutColorsAnsSaveToBlob(Datos,container_name):
         for cell in rowval:
             
             # rojo si Tipo de doc = NE, no encontrado en bd usuarios
-            if f"{cell.column_letter}"=="B" and f"{cell.value}"=="NE":
+            if f"{cell.column_letter}"=="B" and (f"{cell.value}"=="NE" or f"{cell.value}"==""):
                 ws[f"{cell.column_letter}{cell.row}"].fill = fillRed
                 
             # rojo si Direccion, departamente, municipio o país está vacio
-            elif f"{cell.column_letter}"=="B" or f"{cell.column_letter}"=="J" or f"{cell.column_letter}"=="K" or f"{cell.column_letter}"=="L" or f"{cell.column_letter}"=="M":
+            elif f"{cell.column_letter}"=="C" or f"{cell.column_letter}"=="J" :
                 if f"{cell.value}"=="" or f"{cell.value}"=="None" or f"{cell.value}"=="nan":
                     ws[f"{cell.column_letter}{cell.row}"].fill = fillRed
                     
             # Naranja si pagos o abonos en cuenta menores a 500 mil pesos y diferentes de cero
-            elif f"{cell.column_letter}"=="N": 
-                if cell.value<=500000:
+            elif f"{cell.column_letter}"=="K": 
+                if cell.value<0:
                     ws[f"{cell.column_letter}{cell.row}"].fill = fillOrange
                     
     # Subir excel al blob Storage
@@ -489,7 +443,7 @@ def PutColorsAnsSaveToBlob(Datos,container_name):
         stream = tmp.read()
         blockBlob = abs_container_client.upload_blob(name=blob_name_to_save,data=stream)
     return None
-
+"""
 def separarCuentas(df):
     '''
     Separa nits y la razón social del número de cuenta.

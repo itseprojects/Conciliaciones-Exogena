@@ -26,6 +26,8 @@ import json
 import pyodbc
 import requests
 # import grequests
+import sys
+print(sys.version)
 
 # Datos del blob storage
 account_name = 'itseblobdev' #'probepython'
@@ -109,39 +111,90 @@ reteFuentePracRenta = {"5002":[248520,248521],
 reteIvaRegComun = [248710] 
 reteIvaNoDomiciliada = [248711] 
 
-# Función principal que permite analizar el balance, bd de usuarios y municipios de Colombia para formar el Formato 1001
-    # requiere en el body la clave Balance y su valor es el nombre del balance en el Blob Storage
-    # retorna cod 200 con el texto "Ejecución exitosa" si todo fue bien,
-    # si hubo algun error retorna el texto "!! Ocurrió un error en la ejecución." más el posible origen del error
-def main(req: func.HttpRequest) -> func.HttpResponse:
+def validar_datos(req):
+    """
+    Valida si se proporcionaron todos los datos necesarios en la solicitud.
+
+    Args:
+        req: Un objeto JSON que contiene los datos necesarios en la solicitud de la API.
+
+    Returns:
+        Un objeto JSON que contiene un mensaje de error si falta algún dato o una cadena vacía si se proporcionaron todos los datos necesarios.
+
+    Raises:
+        No se lanzan excepciones.
+    """
     Cliente = req.get_json().get('Cliente') # cliente1
-    TipoBalance = req.get_json().get('TipoBalance') #"SIESA"
+    if not Cliente:
+        return {"error":"Sin cliente"}
+    
     blob_name_DB = req.get_json().get('BaseDeDatos') #'BASE DE DATOS EXELTIS.xls'
+    if not blob_name_DB:
+        return{"error":"Sin Base de datos"}
+    
     balanceFile = req.get_json().get('Balance')
+    if not balanceFile:
+        return {"error":"Sin archivo de Balance"}
+    
     idEjecucion = req.get_json().get('IdEjecucion')
+    if not idEjecucion:
+        return {"error":"Sin id de la ejecución"}
+    
     idProcedencia = req.get_json().get('IdProcedencia')
+    if not idProcedencia:
+        return {"error":"Sin id de procedencia"}
+    
     planillas = req.get_json().get('Planillas')
     tipoPlanilla = req.get_json().get('TipoPlanilla')
+
+    if (len(planillas)>0 and not tipoPlanilla ):
+        return {"error":f"Tipo de planilla no indicado"}
+        
+    TipoBalance = req.get_json().get('TipoBalance') #"SIESA"
+    if TipoBalance!="SIESA":
+        return {"error":"Tipo de balance no implementado"}
+
+    return {"error":""}
+
+def main(req: func.HttpRequest) -> func.HttpResponse:
+    dfPlanillas = []
+    exito = json.dumps({"error":"ninguno"}) 
+    error = validar_datos(req).get("error")
+    if error:
+        return func.HttpResponse(json.dumps({"error": error}), status_code=200)
     
-    try:
-        dfPlanillas = analizarPlanillas(planillas,Cliente,tipoPlanilla)
-    except Exception as e:
-        dicToReturn = {"error":f"Error en lectura planillas de seguridad social: {e}"}
-        exito = json.dumps(dicToReturn) 
-        return func.HttpResponse(f"{exito}", status_code=200 )
-    if TipoBalance=="SIESA":
-        # Datos para la base de datos
-        # blob_name_DB = 'BASE DE DATOS EXELTIS.xls'
-        HeaderHojaDB = 0
-        nombreHojaDB="Sheet1"
-        exito = WorkSiesa(Cliente,balanceFile,blob_name_DB,idEjecucion,idProcedencia,dfPlanillas)
-    else: 
-        dicToReturn = {"error":"Tipo de balance no implementado"}
-        exito = json.dumps(dicToReturn) 
+    Cliente = req.get_json().get('Cliente')
+    balanceFile = req.get_json().get('Balance')
+    blob_name_DB = req.get_json().get('BaseDeDatos')
+    idEjecucion = req.get_json().get('IdEjecucion')
+    idProcedencia = req.get_json().get('IdProcedencia')
+    
+    planillas = req.get_json().get('Planillas')
+    tipoPlanilla = req.get_json().get('TipoPlanilla')
+    if len(planillas)>0 and tipoPlanilla:
+        try:
+            dfPlanillas = analizarPlanillas(planillas,Cliente,tipoPlanilla)
+            exito = WorkSiesa(Cliente,balanceFile,blob_name_DB,idEjecucion,idProcedencia,dfPlanillas)
+        except Exception as e:
+            dicToReturn = {"error":f"Error en lectura planillas de seguridad social: {e}"}
+            exito = json.dumps(dicToReturn) 
+    else:
+            exito = WorkSiesa(Cliente,balanceFile,blob_name_DB,idEjecucion,idProcedencia)
 
     return func.HttpResponse(f"{exito}", status_code=200 )
 
 def getData(urlPDF,cliente,tipoPlanilla):
+    """
+    Función que recibe la URL de un archivo PDF, el nombre del cliente y el tipo de planilla y devuelve el nombre del archivo procesado.
+    
+    Parámetros:
+    - urlPDF (str): URL del archivo PDF a procesar.
+    - cliente (str): Nombre del cliente que se está procesando.
+    - tipoPlanilla (str): Tipo de planilla que se está procesando.
+    
+    Retorna:
+    - (str): Ruta del archivo procesado.
+    """
     url = "https://readpdfs.azurewebsites.net/api/readpdf"
     
     data = {
@@ -152,17 +205,38 @@ def getData(urlPDF,cliente,tipoPlanilla):
         "cliente": cliente
     }
     r  = requests.post(url,json=data)
-    print(r)
     return str(r.json()['ruta']).rsplit('/',1)[1]
 
 def analizarPlanillas(planillas,Cliente,tipoPlanilla):
+    """
+    Analiza un conjunto de planillas en formato Excel, ubicadas en el contenedor
+    especificado por el parámetro Cliente del blob storage. Dependiendo del valor del
+    parámetro tipoPlanilla, la función procesará las planillas de acuerdo a diferentes
+    formatos.
+
+    Args:
+        planillas (List[str]): Lista de nombres de archivo de las planillas a procesar.
+        Cliente (str): Nombre del contenedor del blob storage donde se encuentran las
+            planillas a procesar.
+        tipoPlanilla (str): Indica el tipo de planilla que se está procesando. Puede ser
+            "planillaael", "planillasoi" o "planillacompensar".
+
+    Returns:
+        pd.DataFrame: Dataframe que contiene el resultado del análisis de las planillas,
+        con la siguiente estructura de columnas: "Numero de identificacion",
+        "Razón social", "Concepto", "Ingresos Brutos Recibidos", "Pago o abono en cuenta
+        no deducible" y "NumeroCuenta".
+
+    Raises:
+        N/A
+    """
     # Ingreso al blob storage
     blob_service_client = BlobServiceClient(account_url = f'https://{account_name }.blob.core.windows.net/', credential = account_key)
     DatosPlanillas = pd.DataFrame()
     
     with ThreadPoolExecutor() as executor:
         for planilla, ruta in zip(planillas, executor.map(getData,planillas,repeat(Cliente),repeat(tipoPlanilla))):
-            print(f'{planilla} resultado: {ruta}')
+            # print(f'{planilla} resultado: {ruta}')
             blob_client = blob_service_client.get_blob_client(container = Cliente, blob = ruta.replace('%20',' '))
             downloader = blob_client.download_blob()
             Datos = pd.DataFrame()
@@ -208,8 +282,9 @@ def analizarPlanillas(planillas,Cliente,tipoPlanilla):
                         nit_count += 1
                     Datos.loc[index, "Concepto"] = seccion[str(nit_count if nit_count<=4 else 3)]['concepto'] # type: ignore
                 Datos = Datos[Datos['VALOR LIQUIDADO'].notna()]
-                #Datos = Datos.rename(columns={"NOMBRE":"RIESGO"})
-                Datos['VALOR LIQUIDADO'] = Datos['VALOR LIQUIDADO'].str.replace('.', '', regex=True).astype(int)            
+                #Datos['VALOR LIQUIDADO'] = Datos['VALOR LIQUIDADO'].str.replace('.', '', regex=True).astype(int)  
+                Datos['VALOR LIQUIDADO'] = Datos['VALOR LIQUIDADO'].apply(lambda x: int(x.replace(',','').replace('.', '')))  
+                Datos = Datos.loc[:,["NIT","RIESGO","VALOR LIQUIDADO","Concepto"]]        
             DatosPlanillas = pd.concat([DatosPlanillas, Datos], ignore_index=True ).groupby(['NIT','RIESGO','Concepto']).sum(numeric_only=True).reset_index()
             
                 
@@ -221,7 +296,19 @@ def analizarPlanillas(planillas,Cliente,tipoPlanilla):
         
     return DatosPlanillas                                 
 
-def WorkSiesa(container_name,balanceFile,blob_name_DB,idEjecucion,idProcedencia,dfPlanillas):  
+def WorkSiesa(container_name,balanceFile,blob_name_DB,idEjecucion,idProcedencia,dfPlanillas = pd.DataFrame()):  
+    """
+    Elabora y guarda el formato 1009 en el Blob Storage, almacena las comprobaciones en BD.
+    Args:
+        container_name (str): Nombre del contenedor - cliente.
+        balanceFile (str): Nombre del blob para el balance.
+        blob_name_DB (str): Nombre del blob para la BD de Terceros.
+        idEjecucion (int): Número del registro de la ejecución.
+        idProcedencia (int): Numero del registro de la procedencia.
+        rentaPath (str): Url del archivo pdf de la renta.
+    Returns:
+        dicToReturn: json con información de la ejecución de la función.
+    """
     HeaderHojaBalance=11
     nombreHojaBalance= "Hoja 1" 
     try:
@@ -251,8 +338,9 @@ def WorkSiesa(container_name,balanceFile,blob_name_DB,idEjecucion,idProcedencia,
         # Elaborar formato parte contable
         TercerosPorConcepto = GetClientsByConcept(DatosSeparados,ColumnaValorIngreso)
         TercerosPorConcepto = GetClientsByPagoNoDeducible(DatosSeparados,ColumnaValorIngreso,TercerosPorConcepto,'pagoNoDeducible')       
-        # insertar planillas
-        TercerosPorConcepto = pd.concat([TercerosPorConcepto,dfPlanillas], ignore_index=True ).reset_index()
+        # insertar planillas si existen
+        TercerosPorConcepto = pd.concat([TercerosPorConcepto,dfPlanillas], ignore_index=True ).reset_index() if not dfPlanillas.empty else TercerosPorConcepto
+        
         TercerosPorConcepto = GetIvaByClient(DatosSeparados, ColumnaValorIngreso,TercerosPorConcepto,'iva')
         TercerosPorConcepto.insert(6,'Iva mayor valor del costo o gasto no deducible', 0) # Siempre en 0
         TercerosPorConcepto = GetClientsByPagoNoDeducible(DatosSeparados,ColumnaValorIngreso,TercerosPorConcepto,'reteFuente') 
@@ -266,7 +354,9 @@ def WorkSiesa(container_name,balanceFile,blob_name_DB,idEjecucion,idProcedencia,
         saveToBD(dfDiferencias,idEjecucion,idProcedencia)
         # Unir terceros por cada concepto
         TercerosPorConcepto = TercerosPorConcepto.groupby(['Concepto','Numero de identificacion','Razón social']).sum(numeric_only=True).reset_index()
-        TercerosPorConcepto =TercerosPorConcepto .drop('index',axis=1)       
+        try:
+            TercerosPorConcepto =TercerosPorConcepto .drop('index',axis=1)    
+        except: pass   
         # Leer base de datos de usuarios y municipios de Colombia
         blob_client = blob_service_client.get_blob_client(container = container_name, blob = blob_name_DB)
         downloader = blob_client.download_blob()
@@ -300,6 +390,7 @@ def WorkSiesa(container_name,balanceFile,blob_name_DB,idEjecucion,idProcedencia,
         TercerosPorConcepto['Retención en la fuente practicada IVA régimen común'] = TercerosPorConcepto['Retención en la fuente practicada IVA régimen común'].apply(np.ceil)
         TercerosPorConcepto['Retención en la fuente practicada IVA no domiciliados'] = TercerosPorConcepto['Retención en la fuente practicada IVA no domiciliados'].apply(np.ceil)
         TercerosPorConcepto = TercerosPorConcepto.drop(['NumeroCuenta'], axis=1) # Eliminar columna no necesaria
+        TercerosPorConcepto = TercerosPorConcepto.sort_values(by=['Concepto','Numero de identificacion'],ascending=True)
         
         # Ajustar parte estética y almacenar en el BLob Storage
         PutColorsAnsSaveToBlob(TercerosPorConcepto,container_name)
@@ -308,13 +399,23 @@ def WorkSiesa(container_name,balanceFile,blob_name_DB,idEjecucion,idProcedencia,
         dicToReturn = {
             "error":"ninguno",
             "ruta":f'https://{account_name}.blob.core.windows.net/{container_name}/{blob_name_to_save}'
-            }
+        }
 
     except Exception as e:
         dicToReturn = {"error":f"{e}"}
     return json.dumps(dicToReturn)
 
 def saveToBD(comprobations,idEjecucion,idProcedencia):
+    """
+    Almacena las comprobaciones en BD.
+    Args:
+        valorHaxa (int): Valor total de la suma del formato 1008.
+        idEjecucion (int): Número del registro de la ejecución.
+        idProcedencia (int): Numero del registro de la procedencia.
+        rentaPath (str): Url del archivo pdf de la renta.
+    Returns:
+        None.
+    """
     server = 'rbhaxa.database.windows.net' 
     database = 'haxa' 
     username = 'rbitse' 
@@ -322,8 +423,8 @@ def saveToBD(comprobations,idEjecucion,idProcedencia):
     driver= '{ODBC Driver 17 for SQL Server}'# {SQL Server}
     cnxn = pyodbc.connect(f'DRIVER={driver};SERVER={server}'+';DATABASE='+database+';ENCRYPT=yes;UID='+username+';PWD='+ password)
     cursor = cnxn.cursor()
-    for table_name in cursor.tables(tableType='TABLE'):
-        print(table_name)
+    #for table_name in cursor.tables(tableType='TABLE'):
+        #print(table_name)
         
     for i in range(len(comprobations)): 
         nameDiff = comprobations.iloc[i,1].strip()#[0:35]
@@ -338,6 +439,16 @@ def saveToBD(comprobations,idEjecucion,idProcedencia):
     return None
 
 def makeComprobations(TercerosPorConcepto,container_name,DatosSeparados,ColumnaValorIngreso):
+    """
+    Realiza comprobaciones entre los valores contables y los valores reportados de las cuentas contables
+    Parameters:
+        - TercerosPorConcepto: DataFrame con información de terceros por concepto
+        - container_name: nombre del contenedor de almacenamiento de Azure
+        - DatosSeparados: DataFrame con información de los datos separados
+        - ColumnaValorIngreso: nombre de la columna que contiene el valor del ingreso en el DataFrame DatosSeparados
+    Returns:
+        - DataFrame con información de las comprobaciones realizadas
+    """
     tablaParaComprobar = ExtraerCtas(DatosSeparados)
     tablaParaComprobar.columns.values[2] = "ValorContable"
     tablaParaComprobar['Formato'] = 0
@@ -352,20 +463,25 @@ def makeComprobations(TercerosPorConcepto,container_name,DatosSeparados,ColumnaV
                 ind = tablaParaComprobar[(tablaParaComprobar["NumeroCuenta"]==clave4Digitos)].index
                 pasaAjustePeso = True if abs(tablaParaComprobar.loc[ind,'ValorContable'].iloc[0]-tablaParaComprobar.loc[ind,'Formato'].iloc[0])<1000 else False
                 tablaParaComprobar.loc[ind,'Observaciones']='' if pasaAjustePeso else "Valor reportado es diferente al valor contable"
-                if clave4Digitos == 5195:
-                    print(tablaParaComprobar.loc[ind,'ValorContable'].iloc[0],' : contable - formato: ',valorEnFormato)
+                #if clave4Digitos == 5195:
+                    #print(tablaParaComprobar.loc[ind,'ValorContable'].iloc[0],' : contable - formato: ',valorEnFormato)
             except Exception as e:
                 pass
     #tablaParaComprobar["Observaciones"]= np.where(tablaParaComprobar["ValorContable"]==tablaParaComprobar["Formato"],tablaParaComprobar["Observaciones"],"No Coincide")
     return tablaParaComprobar
 
-# Función que agrega color según el tipo de contenido de las columnas y guarda archivo excel en el Blob Storage,
-#   Asigna el color rojo para advertir sobre datos relacionados de la base de datos de usuarios y amarillo para datos relacionados con el balance
-#   requiere de: 
-#       Datos = df del formato con todas las columnas
-#       account_name, account_key, blob_name_to_save
-#   retorna: none
 def PutColorsAnsSaveToBlob(Datos,container_name):
+    '''
+    Guarda el archivo excel coloreado del formato en el Blob Storage.
+    Args:
+        Datos (df): df del formato a guardar.
+        container_name (str): Nombre del contenedor en el Blob Storage.
+        account_name (str): Nombre de la cuenta del Blob.
+        account_key (str): clave de la cuenta del blob.
+        blob_name_to_save (str): Nombre del archivo a guardar.
+    Returns:
+        None.
+    '''
     fillOrange = PatternFill(patternType='solid', fgColor='FCBA03')
     fillRed = PatternFill(patternType='solid', fgColor='EE1111')
     # FilePath = "balance 2021 Exeltis con terceros.xlsx"
@@ -417,14 +533,19 @@ def PutColorsAnsSaveToBlob(Datos,container_name):
         blockBlob = abs_container_client.upload_blob(name=blob_name_to_save,data=stream)
     return None
 
-# Función para obtener el iva, la retención IVA régimen común o la retención IVA no domicialiados segun el modo indicado
-#   requiere de: 
-#       DatosSeparados = balance con cta separada de los datos del tercero 
-#       ColumnaValorIngreso = Columna del valor del ingreso
-#       TercerosPorConcepto = df de los terceros hallados por cada concepto
-#       cualColumna = modo de operación de la función: "iva", "reteIvaRegComun" u "otro valor para no domiciliados"
-#   retorna df con columnas similares a TercerosPorIva más 1 columna extra según el modo de operación
 def GetIvaByClient(DatosSeparados, ColumnaValorIngreso,TercerosPorConcepto, cualColumna):
+    """
+    Función para obtener el IVA, la retención de IVA para el régimen común o la retención de IVA para contribuyentes no domiciliados según el modo indicado.
+
+    Parámetros:
+    DatosSeparados: DataFrame con el balance con cuenta separada de los datos de terceros.
+    ColumnaValorIngreso: Columna del valor de ingresos.
+    TercerosPorConcepto: DataFrame de terceros encontrados para cada concepto.
+    cualColumna: Modo de operación de la función: "iva", "reteIvaRegComun" o cualquier otro valor para contribuyentes no domiciliados.
+    
+    Retorna:
+    DataFrame con columnas similares a TercerosPorIva más 1 columna extra según el modo de operación.
+    """
     TercerosPorIva = pd.DataFrame()
     TercerosPorIva['Concepto'] = None
     TercerosPorIva['Numero de identificacion']= None
@@ -459,12 +580,16 @@ def GetIvaByClient(DatosSeparados, ColumnaValorIngreso,TercerosPorConcepto, cual
     # print(TercerosPorConcepto[['Razón social','Ingresos Brutos Recibidos']])
     return TercerosPorConcepto   
 
-# Función que obtiene los terceros a partir del diccionario conceptos
-#   requiere de: 
-#       DatosSeparados = balance con cta separada de los datos del tercero 
-#       ColumnaValorIngreso = Columna del valor del ingreso
-#   retorna un df con columnas equivalentes a las de TercerosPorConcepto
 def GetClientsByConcept(DatosSeparados, ColumnaValorIngreso):
+    """
+    Función que obtiene los terceros a partir del diccionario conceptos
+    
+    Parámetros: 
+        DatosSeparados = balance con cta separada de los datos del tercero 
+        ColumnaValorIngreso = Columna del valor del ingreso
+    Retorna:
+        Dataframe con columnas equivalentes a las de TercerosPorConcepto
+    """
     TercerosPorConcepto = pd.DataFrame()
     TercerosPorConcepto['Concepto'] = None
     TercerosPorConcepto['Numero de identificacion']= None
@@ -523,14 +648,19 @@ def GetClientsByConcept(DatosSeparados, ColumnaValorIngreso):
     # print(TercerosPorConcepto[['Razón social','Ingresos Brutos Recibidos']])
     return TercerosPorConcepto       
 
-# Función que obtiene los terceros a partir del diccionario pagoNoDeducible o reteFuentePractRenta
-#   requiere de: 
-#       DatosSeparados = balance con cta separada de los datos del tercero 
-#       ColumnaValorIngreso = Columna del valor del ingreso
-#       Terceros = df de los terceros hallados por cada concepto
-#       modo = 2 modo de operación de la función, "pagoNoDeducible" o "otro"
-#   retorna df con columnas equivalentes a las de Terceros más 1 columna extra según el modo de operación
 def GetClientsByPagoNoDeducible(DatosSeparados, ColumnaValorIngreso,Terceros, modo):
+    """
+    Función que obtiene los terceros a partir del diccionario pagoNoDeducible o reteFuentePractRenta
+    
+    Parámetros: 
+        DatosSeparados = balance con cta separada de los datos del tercero 
+        ColumnaValorIngreso = Columna del valor del ingreso
+        Terceros = df de los terceros hallados por cada concepto
+        modo = 2 modo de operación de la función, "pagoNoDeducible" o "otro"
+    
+    Retorna:
+        Dataframe con columnas equivalentes a las de Terceros más 1 columna extra según el modo de operación
+    """
     TercerosPorConcepto = pd.DataFrame()
     TercerosPorConcepto['Concepto'] = None
     TercerosPorConcepto['Numero de identificacion']= None
@@ -584,11 +714,15 @@ def GetClientsByPagoNoDeducible(DatosSeparados, ColumnaValorIngreso,Terceros, mo
     TercerosPorConcepto = TercerosPorConcepto.drop(['NumeroCuenta_x', 'NumeroCuenta_y'], axis=1)
     return TercerosPorConcepto  
 
-# Función que lee la columna Cuentas, separa nits de razón social y las cuentas
-#   requiere de:
-#       df = df del balance
-#   retorna: df más 3 columnas extras: Razón social, NIT y NumeroCuenta
 def separarCuentas(df):
+    """
+    Separa nits y la razón social del número de cuenta.
+    Args:
+        df (df): df del balance.
+
+    Returns:
+        df: df con 3 columnas extras (Razón social, NIT y NumeroCuenta).
+    """
     cuentas=df["Cuentas"]
     if "Descripción" in cuentas[0]:
         cuentas=cuentas[1:]
@@ -614,30 +748,36 @@ def separarCuentas(df):
     df.insert(1,"NumeroCuenta",VectorCuentas)
     return df
 
-# Función para el formato 1007 que obtiene el valor total de:
-#   ingresos: ctas 4135 y 4155,
-#   devoluciones: cta 4175,
-#   otros ingresos: ctas 42 y
-# retorna la suma de de los anteriores (ingresos+devoluciones)
 def ObtenerIngresos(df,ColumnaValorIngreso):
+    """
+    Función que obtiene el valor total de:
+      ingresos: ctas 4135 y 4155,
+      devoluciones: cta 4175,
+      otros ingresos: ctas 42 y
+    Retorna la suma de de los anteriores (ingresos+devoluciones)
+    """
     ingresosAO = df[(df['NumeroCuenta']>413499)&(df['NumeroCuenta']<417000)&(df['NIT']!="")].iloc[:, ColumnaValorIngreso].sum()
-    print('4135+55',': ',ingresosAO)#,df[(df['NumeroCuenta']==4135)].iloc[0]['             Descripción                                '].strip()
+    #print('4135+55',': ',ingresosAO)#,df[(df['NumeroCuenta']==4135)].iloc[0]['             Descripción                                '].strip()
     devoluciones= df[(df['NumeroCuenta']<417600)&(df['NumeroCuenta']>417499)&(df['NIT']!="")].iloc[:, ColumnaValorIngreso].sum()
-    print('4175',': ',devoluciones)#df[(df['NumeroCuenta']==4175)].iloc[0]['             Descripción                                '].strip(),
+    #print('4175',': ',devoluciones)#df[(df['NumeroCuenta']==4175)].iloc[0]['             Descripción                                '].strip(),
     ingresosO = df[(df['NumeroCuenta']<430000)&(df['NumeroCuenta']>420999)&(df['NIT']!="")].iloc[:, ColumnaValorIngreso].sum()
-    print('42',': ',ingresosO)#df[(df['NumeroCuenta']==42)].iloc[0]['             Descripción                                '].strip(),
-    print('TOTAL INGRESOS :',ingresosAO+devoluciones+ingresosO)
+    #print('42',': ',ingresosO)#df[(df['NumeroCuenta']==42)].iloc[0]['             Descripción                                '].strip(),
+    #print('TOTAL INGRESOS :',ingresosAO+devoluciones+ingresosO)
     return ingresosAO+devoluciones+ingresosO
 
-# Función que obtiene el valor de la columnaValorIngreso para terceros únicos entre un rango definido,
-#   requiere de: 
-#       df = df del balance 
-#       limiteInferiorCta = rango mínimo del valor de cta a buscar, incluido
-#       LimiteSuperiorCta = rango máximo del valor de la busqueda, no incluido 
-#       nombreDatoColumna = nombre de la columna a insertar en el df de salida
-#       ColumnaValorIngreso = valor numérico de la columna Saldo final a (del balance)
-#   retorna df con 3 columnas: Razón social, Numero de identificacion y valor de nombreDatoColumna 
 def UnificarClientesPorCuenta(df,limiteInferiorCta,LimiteSuperiorCta,nombreDatoColumna,ColumnaValorIngreso):
+    '''
+    Obtiene el valor de la columnaValorIngreso del dfBalance para terceros únicos entre un rango definido.
+    Args:
+        df (df): df del balance con el número de cuenta separada de la información del tercero.
+        limiteInferiorCta (int): rango mínimo del valor de cta a buscar, incluido
+        LimiteSuperiorCta (int): rango máximo del valor de la busqueda, no incluido 
+        nombreDatoColumna (str): nombre de la columna a insertar en el df de salida
+        ColumnaValorIngreso (int): Número de la columna Saldo final a (del balance) 
+
+    Returns:
+        datosPorCliente: df con el Numero de identificacion, Razón social y el valor contable del tercero.
+    '''
     datosPorCliente = pd.DataFrame()
     listaSoloClientesIngreso = df[(df['NIT']!="")&(df['NumeroCuenta']>=limiteInferiorCta)&(df['NumeroCuenta']<LimiteSuperiorCta)]
     listaUnica = listaSoloClientesIngreso["Razón social"].unique().tolist()
@@ -803,7 +943,7 @@ def ExtraerCtas(Datos):
         # Datos = pd.read_excel(FilePath, sheet_name=nombreHojaBalance, header=HeaderHojaBalance)
         Datos =  Datos[Datos['NumeroCuenta'].apply( lambda x: str(x).startswith(('14','15','5','6','7')) and x<10000)]
         Datos = Datos.iloc[:,[1,4,8]]
-        print(Datos)
+        # print(Datos)
         return Datos
     except : False
 

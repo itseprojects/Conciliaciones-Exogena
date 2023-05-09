@@ -90,7 +90,7 @@ def WorkSiesa(container_name,balanceFile,blob_name_DB,idEjecucion,idProcedencia)
         downloader = blob_client.download_blob()
         dbUsers = pd.read_excel(downloader.readall(), sheet_name="Sheet1", header=0)#,engine='openpyxl')
         # Elaborar formato parte contable
-        TercerosPorConcepto = GetClientsByConcept(DatosSeparados,ColumnaValorIngreso,dbUsers[['Código','Tipo de tercero']])
+        TercerosPorConcepto = GetClientsByConcept(DatosSeparados,ColumnaValorIngreso,dbUsers[['Numero identificación','Tipo de tercero']])
         # Leer municipios de Colombia
         blob_client = blob_service_client.get_blob_client(container = container_name, blob = blob_name_DB)
         downloader = blob_client.download_blob()
@@ -457,7 +457,8 @@ def get_tipo_persona(numero_identificacion,dbUsers):
     Returns:
         str: La posición 2 del registro correspondiente en el DataFrame dbUsers, o "No encontrado" si no existe.
     """
-    dbUsers['Código'] = dbUsers['Código'].apply(lambda x: x.strip())
+    #dbUsers['Código'] = dbUsers['Código'].apply(lambda x: x.strip())
+    dbUsers['Código'] = dbUsers['Numero identificación'].apply(lambda x: x.strip().split("-")[0])
     registro = dbUsers.loc[dbUsers['Código'] == numero_identificacion.strip()]
     persona = registro.iloc[0, 1] if not registro.empty else "No encontrado"
     if persona.upper() == 'PERSONA NATURAL':
